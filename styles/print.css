@@ -8,6 +8,31 @@
    tables all print. Anything you would take into a room should survive the
    printer. */
 
+/* Printing is always black on white, whatever the screen is doing.
+   Without resetting the tokens, a dark-mode reader prints dark chips, dark
+   status borders and dark rules: wasteful, and it looks broken. These selectors
+   deliberately repeat the dark ones so they win on source order against the
+   same specificity in base.css. */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  color-scheme: light;
+  --paper: #fff;
+  --paper-raised: #fff;
+  --ink: #000;
+  --ink-soft: #333;
+  --ink-faint: #666;
+  --rule: #ccc;
+  --rule-strong: #999;
+  --rubric: #000;
+  --accent-ok: #000;
+  --accent-warn: #000;
+  --on-highlight: #fff;
+  --scrim: transparent;
+  --tint: #f2f2f2;
+  --sunken: transparent;
+}
+
 @page { margin: 18mm 16mm; }
 
 body {

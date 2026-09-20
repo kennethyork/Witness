@@ -8,6 +8,11 @@
    behind. */
 
 :root {
+  /* Tells the browser which scheme the native furniture is drawn in: form
+     controls, scrollbars, the search field's clear button. Without it those
+     follow the system and disagree with the theme chosen in the app. */
+  color-scheme: light;
+
   --paper: #faf8f5;
   --paper-raised: #ffffff;
   --ink: #1c1917;
@@ -18,6 +23,9 @@
   --rubric: #a32e22;
   --accent-ok: #2f6b3f;
   --accent-warn: #8a5a12;
+  /* Text drawn on a filled accent (the toasts). Inverts with the theme,
+     because the accents themselves are dark on light and light on dark. */
+  --on-highlight: #ffffff;
 
   --font-text: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman',
     'Noto Serif Hebrew', 'Noto Sans Hebrew', 'Noto Naskh Arabic', 'Noto Sans Arabic',
@@ -40,23 +48,16 @@
   --sunken: rgb(28 25 23 / 0.03);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #14120f;
-    --paper-raised: #1d1a16;
-    --ink: #f2ece3;
-    --ink-soft: #b5ada1;
-    --ink-faint: #8b8377;
-    --rule: #302b25;
-    --rule-strong: #443d34;
-    --rubric: #e08a7c;
-    --accent-ok: #8fbf9a;
-    --accent-warn: #d9ab5e;
-  }
-}
-
-/* Declared after the media query so an explicit choice beats the system one. */
+/* Dark mode, declared once.
+   An earlier version of this file listed the whole palette twice: once inside a
+   prefers-color-scheme query and once for an explicit choice. Two copies of the
+   same nine colours, updated independently, is a drift hazard, so "follow the
+   system" is resolved in JavaScript instead and this is the only dark palette.
+   The head script in index.html sets the attribute before the first paint, so a
+   dark-mode reader never sees a flash of the light theme. */
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --paper: #14120f;
   --paper-raised: #1d1a16;
   --ink: #f2ece3;
@@ -67,6 +68,11 @@
   --rubric: #e08a7c;
   --accent-ok: #8fbf9a;
   --accent-warn: #d9ab5e;
+  --on-highlight: #1c1917;
+
+  --scrim: rgb(0 0 0 / 0.62);
+  --tint: rgb(224 138 124 / 0.12);
+  --sunken: rgb(255 255 255 / 0.03);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -143,7 +149,19 @@ p { margin: 0 0 0.7rem; }
 .site nav a:hover { color: var(--rubric); }
 .kbd { font-family: var(--font-mono); font-size: 0.72rem; border: 1px solid var(--rule-strong); border-radius: 3px; padding: 0.05rem 0.3rem; color: var(--ink-faint); flex-shrink: 0; align-self: center; }
 /* The shortcut hint is the first thing to go when the nav runs out of room. */
-@media (max-width: 46rem) { .kbd { display: none; } }
+@media (max-width: 52rem) { .kbd { display: none; } }
+
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font: inherit; font-size: 0.86rem; padding: 0.2rem 0.55rem;
+  color: var(--ink-soft); background: transparent;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  cursor: pointer; flex-shrink: 0; align-self: center;
+}
+.theme-toggle:hover { color: var(--rubric); border-color: var(--rubric); }
+.theme-icon { font-size: 0.95rem; line-height: 1; }
+/* Icon only where the nav is tight; the label is for screen readers there. */
+@media (max-width: 56rem) { .theme-label { display: none; } }
 
 footer.site { border-block: 0; border-block-start: 1px solid var(--rule); margin-block-start: 4rem; }
 footer.site p { margin: 0.2rem 0; font-size: 0.84rem; color: var(--ink-soft); }
@@ -356,13 +374,6 @@ fieldset.nested-group { border-style: dashed; margin: 0.8rem 0; background: var(
 
 /* ---------------------------------------------------------------- palette */
 
-/* Dark overrides for the tokens above, declared once and after the light values.
-   Specificity beats :root, so source order does not matter here. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --scrim: rgb(0 0 0 / 0.62); --tint: rgb(224 138 124 / 0.12); --sunken: rgb(255 255 255 / 0.03); }
-}
-:root[data-theme="dark"] { --scrim: rgb(0 0 0 / 0.62); --tint: rgb(224 138 124 / 0.12); --sunken: rgb(255 255 255 / 0.03); }
-
 body.palette-open { overflow: hidden; }
 .palette {
   position: fixed; inset: 0; z-index: 40;
@@ -391,8 +402,8 @@ body.palette-open { overflow: hidden; }
   padding: 0.7rem 1rem; border-radius: var(--radius); font-size: 0.9rem; z-index: 50;
 }
 .toast p { margin: 0; }
-.toast.warn { background: var(--accent-warn); color: #1c1917; }
-.toast.error { background: var(--rubric); color: #fff; }
+.toast.warn { background: var(--accent-warn); color: var(--on-highlight); }
+.toast.error { background: var(--rubric); color: var(--on-highlight); }
 .citation-block { margin: 0.5rem 0 0; white-space: pre-wrap; font-size: 0.8rem; }
 
 @media (prefers-reduced-motion: reduce) {

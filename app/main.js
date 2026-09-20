@@ -108,12 +108,64 @@ async function copyAndSay(text, successMessage) {
 
 // ------------------------------------------------------------------- settings
 
+const THEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
+const THEME_ICONS = { light: '☀', dark: '☾' };
+const prefersDark = () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+
+/**
+ * Which theme is actually on screen.
+ *
+ * "Follow the system" is resolved here rather than by a CSS media query, so the
+ * dark palette is written down once, in styles/base.css. The header script does
+ * the same resolution before the first paint; this is the same rule applied
+ * after it.
+ */
+function effectiveTheme() {
+  const chosen = state.settings.theme || 'system';
+  if (chosen === 'light' || chosen === 'dark') return chosen;
+  return prefersDark() ? 'dark' : 'light';
+}
+
 function applySettings() {
   const root = document.documentElement;
-  if (state.settings.theme && state.settings.theme !== 'system') root.dataset.theme = state.settings.theme;
-  else delete root.dataset.theme;
+  root.dataset.theme = effectiveTheme();
   root.style.setProperty('--text-scale', String(state.settings.textScale || '1'));
   root.dataset.translit = state.settings.transliteration === false ? 'off' : 'on';
+  syncThemeToggle();
+}
+
+/**
+ * Keep the header button honest about what it will do next.
+ *
+ * The title and aria-label carry the full story, including whether the system
+ * preference is currently in charge, because a two-state button that cycles
+ * through three states is a worse answer than saying plainly what is happening.
+ */
+function syncThemeToggle() {
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+
+  const chosen = state.settings.theme || 'system';
+  const effective = effectiveTheme();
+  const following = chosen === 'system' ? ' (following your system)' : '';
+  const description =
+    `Colour theme: ${THEME_LABELS[effective].toLowerCase()}${following}. ` +
+    `Switch to ${effective === 'dark' ? 'light' : 'dark'}.`;
+
+  toggle.title = description;
+  toggle.setAttribute('aria-label', description);
+  const label = toggle.querySelector('.theme-label');
+  if (label) label.textContent = THEME_LABELS[effective];
+  const icon = toggle.querySelector('.theme-icon');
+  if (icon) icon.textContent = THEME_ICONS[effective];
+}
+
+/** Switching is explicit: it stops following the system and records a choice. */
+function toggleTheme() {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  changeSetting('theme', next);
+  toast(`Reading in ${next} mode.`);
+  if (state.route.name === 'settings') render();
 }
 
 function changeSetting(key, value) {
@@ -708,6 +760,14 @@ window.addEventListener('hashchange', () => {
     }
   }
   render({ moveFocus: true });
+});
+
+document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+
+// When the app is following the system and the system changes, follow it. The
+// CSS no longer reacts to this on its own, because the palette is resolved here.
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+  if ((state.settings.theme || 'system') === 'system') applySettings();
 });
 
 window.addEventListener('keydown', (event) => {

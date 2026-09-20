@@ -137,6 +137,9 @@ if (!/const VERSION = '/.test(serviceWorker)) {
   fail('sw.js: no VERSION constant, so cached clients can never be invalidated');
 }
 
+// The shell, read once and used by the checks below (inline script, asset paths).
+const shell = await readFile(path.join(root, 'index.html'), 'utf8');
+
 // 4b. Stylesheet hazards that only show up in a real browser.
 const baseCss = await readFile(path.join(root, 'styles', 'base.css'), 'utf8');
 const printCss = await readFile(path.join(root, 'styles', 'print.css'), 'utf8');
@@ -167,8 +170,35 @@ if (/\.palette\s*\{[^}]*display:\s*flex/.test(baseRules) && !/body\.palette-open
   warn('base.css: .palette sets display: flex; make sure it can still be hidden');
 }
 
+// 4c. The theme is applied by an inline script before the first paint, which
+//     means the storage key is written in two places. If they drift, dark mode
+//     silently stops working and nobody notices until somebody complains about
+//     a flash of white. So the drift is a build failure.
+const storeSource = await readFile(path.join(appDir, 'store.js'), 'utf8');
+const prefixMatch = storeSource.match(/const PREFIX = '([^']+)'/);
+if (!prefixMatch) {
+  fail('store.js: no PREFIX constant to check the inline theme script against');
+} else {
+  const inline = shell.match(/<script>([\s\S]*?)<\/script>/);
+  if (!inline) {
+    fail('index.html: no inline script, so the theme is applied only after first paint and dark mode flashes light');
+  } else {
+    if (!inline[1].includes(`${prefixMatch[1]}settings`)) {
+      fail(`index.html: the inline theme script does not read ${prefixMatch[1]}settings, which is the key store.js writes`);
+    }
+    if (!/root\.dataset\.theme\s*=/.test(inline[1])) {
+      fail('index.html: the inline script does not set data-theme');
+    }
+  }
+}
+
+// 4d. Both schemes must be declared, or native controls keep following the
+//     system and disagree with the theme chosen in the app.
+if (!/color-scheme:\s*light/.test(baseRules) || !/color-scheme:\s*dark/.test(baseRules)) {
+  fail('base.css: color-scheme is not declared for both themes, so form controls and scrollbars will not follow the chosen theme');
+}
+
 // 5. Every local file the shell references must exist.
-const shell = await readFile(path.join(root, 'index.html'), 'utf8');
 for (const match of shell.matchAll(/(?:href|src)="(\.\/[^"]+)"/g)) {
   const relative = match[1].replace(/^\.\//, '');
   try {

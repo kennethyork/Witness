@@ -10,6 +10,32 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="stylesheet" href="./styles/base.css">
 <link rel="stylesheet" href="./styles/print.css" media="print">
+<script>
+/* Apply the saved theme before the first paint, so a dark-mode reader never
+   sees a flash of the light theme. "Follow the system" is resolved here rather
+   than in a media query, which keeps one dark palette in styles/base.css.
+
+   Deliberately inline and deliberately tiny: it must run before paint, must
+   never throw, and must not block rendering. The storage key is the one
+   app/store.js uses; scripts/check-modules.mjs fails the build if they drift.
+   Note that a future Content-Security-Policy without 'unsafe-inline' would
+   silently disable this, and dark mode would return to flashing. */
+(function () {
+  var root = document.documentElement;
+  try {
+    var raw = localStorage.getItem('witness:v1:settings');
+    var settings = raw ? JSON.parse(raw) : {};
+    var chosen = settings.theme;
+    var dark = chosen === 'dark' || (chosen !== 'light' &&
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.dataset.theme = dark ? 'dark' : 'light';
+    if (settings.textScale) root.style.setProperty('--text-scale', String(settings.textScale));
+    root.dataset.translit = settings.transliteration === false ? 'off' : 'on';
+  } catch (error) {
+    root.dataset.theme = 'light';
+  }
+})();
+</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -25,6 +51,10 @@
       <a href="#/compare">Compare</a>
       <a href="#/drafts">Drafts</a>
       <a href="#/about">About</a>
+      <button class="theme-toggle" id="theme-toggle" type="button">
+        <span class="theme-icon" aria-hidden="true">◐</span>
+        <span class="theme-label">System</span>
+      </button>
       <span class="kbd" title="Command palette">⌘K</span>
     </nav>
   </div>
