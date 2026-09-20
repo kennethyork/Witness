@@ -24,8 +24,9 @@ import { migrateLegacyStorage, loadDraftCards, loadSettings } from '../app/store
 import {
   blankDebate, debateSlug, nextMoveId, lintDebate, debateState, debateToMarkdown,
   moveDigest, termsDigest, transcriptDigest, verifyChain, stampChain,
-  contributionFor, mergeContribution, restampAll,
+  contributionFor, mergeContribution, restampAll, debatePublication,
 } from '../app/debate.js';
+import { debateToAif, aifProblems } from '../app/aif.js';
 import {
   FORMATS, FORMAT_KEYS, SIDE_KEYS, blankSession, sessionId, suggestBurden,
   phasesFor, currentPhase, formatClock, roomClock, advancePhase, lastPhase,
@@ -1000,6 +1001,105 @@ check('the session transcript prints the pinned terms', transcriptWithTerms.incl
 check('and prints how the sides read them', transcriptWithTerms.includes('two readings'));
 
 
+
+// --------------------------------------------------- argument graph export
+
+// Sides keyed a/b to match the moves. An earlier version of this fixture mixed
+// the pro/con convention with the a/b one, and aifProblems caught it: the graph
+// named a participant who was not listed.
+const stampedDebate = { ...sharedOpening(), sides: [
+  { id: 'a', name: 'Affirming', position: 'affirms', burden: 'show a reader is misled' },
+  { id: 'b', name: 'Denying', position: 'denies', burden: 'show the rendering carries the sense' },
+] };
+stampedDebate.moves = [
+  move('m1', 'a', 'argument', 'The rendering smuggles in a category the Sanskrit lacks.', {
+    warrant: 'The category is nineteenth-century.',
+    evidence: [{ source: 'Card: dharma', card: 'dharma' }],
+  }),
+  move('m2', 'b', 'objection', 'Readers recover the sense from context.', {
+    steelman: 'The affirmative is right that the category is recent, and the objection is about what a reader can recover anyway.',
+    targets: ['m1'],
+    warrant: 'Translation is a first step.',
+  }),
+  move('m3', 'a', 'argument', 'An assertion with nothing behind it.'),
+];
+stampChain(stampedDebate);
+
+const graph = debateToAif(stampedDebate);
+check('the graph carries the containers the profile requires', Boolean(graph.AIF.nodes && graph.AIF.edges && graph.AIF.locutions));
+check('it is marked as a dialogue', graph.dialog === true);
+check('each side becomes a participant', graph.AIF.participants.length === 2);
+check('the motion is recorded as a proposition', graph.AIF.nodes.some((n) => n.nodeID === 'motion' && n.type === 'I'));
+
+// The spec's constraints, checked on the graph we actually emit.
+const graphProblems = aifProblems(graph);
+check('the graph satisfies AIF\u2019s constraints', graphProblems.length === 0, graphProblems.join('; '));
+check(
+  'no edge runs I-node to I-node, which AIF forbids',
+  !graph.AIF.edges.some((edge) => {
+    const from = graph.AIF.nodes.find((n) => n.nodeID === edge.fromID);
+    const to = graph.AIF.nodes.find((n) => n.nodeID === edge.toID);
+    return from?.type === 'I' && to?.type === 'I';
+  })
+);
+
+// The constraint doing real work: an unsupported claim cannot be an inference.
+check(
+  'a supported argument becomes an RA node',
+  graph.AIF.nodes.some((n) => n.nodeID === 'ra_m1' && n.type === 'RA')
+);
+check(
+  'and carries its evidence and warrant as premises',
+  graph.AIF.edges.filter((edge) => edge.toID === 'ra_m1').length === 2
+);
+check(
+  'a supported objection becomes a CA node',
+  graph.AIF.nodes.some((n) => n.nodeID === 'ca_m2' && n.type === 'CA')
+);
+check(
+  'the conflict runs from the objecting claim to the claim attacked',
+  graph.AIF.edges.some((e) => e.fromID === 'claim_m2' && e.toID === 'ca_m2')
+    && graph.AIF.edges.some((e) => e.fromID === 'ca_m2' && e.toID === 'claim_m1')
+);
+check(
+  'an assertion with nothing behind it gets no inference node',
+  !graph.AIF.nodes.some((n) => n.nodeID === 'ra_m3' && n.type === 'RA')
+);
+check(
+  'and no preference nodes are invented',
+  !graph.AIF.nodes.some((n) => n.type === 'PA')
+);
+check('each move produces a locution naming who said it', graph.AIF.locutions.some((l) => String(l.text).startsWith('Affirming:')));
+check('the graph is deterministic', JSON.stringify(debateToAif(stampedDebate)) === JSON.stringify(graph));
+
+// The validator must actually catch a violation, or it is decoration.
+const broken = JSON.parse(JSON.stringify(graph));
+broken.AIF.edges.push({ edgeID: 'zz', fromID: 'claim_m1', toID: 'claim_m2' });
+check('the validator rejects an I to I edge', aifProblems(broken).some((p) => p.includes('I-node to I-node')));
+const noPremise = JSON.parse(JSON.stringify(graph));
+noPremise.AIF.edges = noPremise.AIF.edges.filter((edge) => edge.toID !== 'ra_m1');
+check('the validator rejects an inference with no premise', aifProblems(noPremise).some((p) => p.includes('no premise')));
+const dangling = JSON.parse(JSON.stringify(graph));
+dangling.AIF.edges.push({ edgeID: 'yy', fromID: 'nope', toID: 'claim_m1' });
+check('the validator rejects an edge to a node that is not there', aifProblems(dangling).some((p) => p.includes('not a node')));
+
+// ---------------------------------------------------------------- publishing
+
+const publication = debatePublication({ ...stampedDebate, _savedAt: '2026-01-01T00:00:00.000Z' });
+check('a publication names the file it belongs in', publication.path === `debates/${publication.id}.json`);
+check('local bookkeeping does not travel with it', !publication.json.includes('_savedAt'));
+check('and it is a witness debate record', JSON.parse(publication.json).format === 'witness/debate');
+check('the pull request title carries the motion', publication.title.includes('loving-kindness'));
+check('the description says what is missing', publication.body.includes('Objections nobody answered'));
+check('the description says how to verify it', publication.body.includes('node scripts/build.mjs'));
+check('the description asks the contributor to confirm authorship', publication.body.includes('not altered anyone'));
+check('a publishable debate has no errors', publication.errors.length === 0, JSON.stringify(publication.errors));
+check('its own lint passes, so the build will accept it', lintDebate(stampedDebate).filter((f) => f.level === 'error').length === 0);
+check('the same debate publishes to the same bytes', debatePublication(stampedDebate).json === debatePublication(stampedDebate).json);
+check(
+  'a debate with errors reports them instead of publishing quietly',
+  debatePublication({ ...stampedDebate, sides: [{ id: 'a', name: 'A', position: 'affirms', burden: '' }] }).errors.length > 0
+);
 
 // ------------------------------------------------------------------ report
 

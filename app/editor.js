@@ -1487,6 +1487,8 @@ export function debateEditorView({
       button('Save', () => onSave(debate)),
       button('Export debate JSON', () => onExport('debate', debate), { class: 'ghost' }),
       button('Export for circulation (Markdown)', () => onExport('debate-markdown', debate), { class: 'ghost' }),
+      button('Export as an argument graph (AIF)', () => onExport('debate-aif', debate), { class: 'ghost' }),
+      button('Publish this debate', () => onExport('debate-publish', debate), { class: 'ghost' }),
       button('Print', () => window.print(), { class: 'ghost' }),
       button('Start over', () => onReset(), { class: 'ghost' }),
       button('Delete', () => onDelete(debate.id), { class: 'ghost danger' })

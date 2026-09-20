@@ -224,6 +224,14 @@ so that nobody can claim they were not warned: the losses here are what
 languages do to each other, and every tradition in this base has lost something
 in translation. That is the argument for recording them, not against any of them.
 
+## Governance
+
+[GOVERNANCE.md](GOVERNANCE.md) and [CODE-OF-CONDUCT.md](CODE-OF-CONDUCT.md) answer the three questions a cited commons has to answer, or it dies quietly: **who may assert something, who may mark it reviewed, and who may remove it.**
+
+The short version: anyone may contribute and it is labelled unreviewed; only a named person with standing in the relevant tradition marks it reviewed, and they can never review their own work; reviewers who disagree get both positions recorded rather than a maintainer breaking the tie; and nothing is ever removed silently, because a commons that deletes quietly has no history worth citing.
+
+The governance document also records what is **not** decided yet — how standing is established, how many reviewers close a card, how appeals work with one maintainer — rather than implying settled authority. That list is there because Wikidebate was discontinued for want of exactly this, and because an unwritten rule is a rule that gets decided by accident.
+
 ## Contributing a debate
 
 A published debate is one file in `debates/`. To add one, or to add a move to an
@@ -232,7 +240,8 @@ existing one:
 1. Read it in the app and **take a side**, which makes a local copy on your device.
 2. Add your moves there. They are stamped as you go, so nobody can alter them later without the digests failing.
 3. **Export my contribution** gives you a file containing only the moves you added.
-4. Open a pull request adding either the new debate, or your moves merged into the existing one. Or open an issue and attach the file, and somebody will do the git part.
+4. **Publish this debate** gives you the file under the path it belongs at, plus the text of a pull request ready to paste. It refuses if the record has errors, because a published debate that fails the build wastes somebody else's afternoon.
+5. Open a pull request adding either the new debate, or your moves merged into the existing one. Or open an issue and attach the file, and somebody will do the git part.
 
 The build lints every published debate with the same rules the editor applies:
 every argument states its claim, every objection restates what it attacks, and no

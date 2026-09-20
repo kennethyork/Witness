@@ -162,6 +162,25 @@ signatures would close the fabrication gap, and they are the upgrade path — th
 need a secure context and a key-management story that a static folder does not
 have.
 
+### As an argument graph
+
+A debate exports to the Argument Interchange Format, for tools that read AIF-JSON.
+Moves become I-nodes (propositions) and L-nodes (locutions, "speaker: text");
+evidence and warrants become premises; a supported claim becomes an `RA` node and
+an objection becomes a `CA` node.
+
+Two constraints of the format are load-bearing rather than inconvenient:
+
+- no edge may run I-node to I-node, so nothing is drawn between an opening claim
+  and the motion it argues about — that relation would be invented;
+- an `RA` node needs at least one premise, so an argument citing nothing exports
+  as a bare proposition. The standard says what the linter says.
+
+`PA` nodes are deliberately not emitted: preference between arguments is a real
+AIF concept and this record has none, because a concession is not a preference.
+`aifProblems()` checks an emitted graph against the constraints above, and the
+export refuses rather than producing a graph the receiving tool cannot explain.
+
 ### From the room
 
 A live session (a room) is not a record. `sessionToDebate` converts one at the

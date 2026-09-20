@@ -34,8 +34,9 @@ import {
 import {
   blankDebate, debateSlug, lintDebate, debateToMarkdown,
   stampChain, restampAll, contributionFor, mergeContribution,
-  nextMoveId, transcriptDigest, termsDigest,
+  nextMoveId, transcriptDigest, termsDigest, debatePublication,
 } from './debate.js';
+import { debateToAif, aifProblems } from './aif.js';
 import {
   loadDraftCards, saveDraftCard, deleteDraftCard,
   loadStatements, saveStatement, deleteStatement,
@@ -437,6 +438,8 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
             addMove: (sideId, move) => addMove(shown, sideId, move),
             edit: () => go(`/debate/${encodeURIComponent(shown.id)}/edit`),
             contribute: () => exportMyContribution(shown),
+            publish: () => publishDebate(shown),
+            aif: () => exportAif(shown),
             copyMarkdown: () => copyAndSay(debateToMarkdown(shown), 'The record copied as Markdown.'),
           },
         }));
@@ -662,6 +665,42 @@ function exportMyContribution(debate) {
     }, null, 2)}\n`
   );
   toast(`Contribution downloaded: ${mine.length} move(s) of yours. Send the file; nothing was uploaded.`);
+}
+
+/**
+ * Publish a debate: the file, under the name it must have, and the text of the
+ * pull request. Refused outright if the record has errors, because a published
+ * debate that fails the build wastes somebody else's afternoon.
+ */
+function publishDebate(debate) {
+  const publication = debatePublication(debate);
+  if (publication.errors.length) {
+    toast(
+      `Not published: ${publication.errors.length} problem(s) in the record. First one: ${publication.errors[0].message}`,
+      { sticky: true, tone: 'error' }
+    );
+    return;
+  }
+
+  download(filename('debate', publication.id, 'json'), publication.json);
+  copyAndSay(
+    publication.body,
+    `Downloaded as a file to save at ${publication.path}. The pull request description is on your clipboard: paste it when you open the pull request.`
+  );
+}
+
+/** Argument graph export, for moving a debate into argumentation tooling. */
+function exportAif(debate) {
+  const graph = debateToAif(debate);
+  const problems = aifProblems(graph);
+  if (problems.length) {
+    // Refusing is the point: a graph that breaks the format's own rules is worse
+    // than no export, because the tool receiving it cannot say why it failed.
+    toast(`Not exported: the graph would not be valid AIF — ${problems[0]}`, { sticky: true, tone: 'error' });
+    return;
+  }
+  download(filename('debate', `${debate.id}-aif`, 'json'), `${JSON.stringify(graph, null, 2)}\n`);
+  toast('Exported as an argument graph. Argumentation tools that read AIF-JSON should open it.');
 }
 
 function saveDebateDraft(debate) {
@@ -898,6 +937,10 @@ function exportEverythingFor(kind, payload) {
       download(filename('debate', payload.id || payload.motion, 'json'), `${JSON.stringify(payload, null, 2)}\n`);
       toast('Debate record downloaded. The JSON is the record of what each side actually said.');
       return;
+    case 'debate-aif':
+      return exportAif(payload);
+    case 'debate-publish':
+      return publishDebate(payload);
     case 'debate-markdown':
       download(filename('debate', payload.id || payload.motion, 'md'), debateToMarkdown(payload), 'text/markdown');
       toast('Markdown downloaded. This is the version to circulate, including the objections nobody answered.');

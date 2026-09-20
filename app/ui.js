@@ -669,6 +669,8 @@ export function debateThreadView({
     actionsBar(
       mine ? button('Edit my copy in full', () => actions.edit(), { class: 'ghost' }) : null,
       mine ? button('Export my contribution', () => actions.contribute(), { class: 'ghost' }) : null,
+      mine ? button('Publish this debate', () => actions.publish(), { class: 'ghost' }) : null,
+      button('Export as an argument graph (AIF)', () => actions.aif(), { class: 'ghost' }),
       button('Copy the record', () => actions.copyMarkdown(), { class: 'ghost' }),
       button('Print', () => window.print(), { class: 'ghost' })
     )

@@ -690,6 +690,71 @@ export function stampChain(debate, { at = new Date().toISOString() } = {}) {
 }
 
 /**
+ * Everything needed to publish a debate, so nobody has to know git.
+ *
+ * Returns the file that belongs in `debates/`, under the name it must have, and
+ * the text of a pull request description that says what it is and what is
+ * missing. The point is that publishing is one button rather than a lesson in
+ * forking a repository.
+ */
+export function debatePublication(debate, { at = new Date().toISOString() } = {}) {
+  const state = debateState(debate);
+  const findings = lintDebate(debate);
+  const errors = findings.filter((finding) => finding.level === 'error');
+
+  // Local bookkeeping must not travel: a publication is a record, not a save file.
+  const { _savedAt, _from, ...publishable } = debate;
+  publishable.format = 'witness/debate';
+  if (!publishable.id) publishable.id = debateSlug(debate);
+
+  const sideSummary = (debate.sides || [])
+    .map((side) => `${side.name || side.id} (${side.position || 'undecided'})`)
+    .join(' v ');
+
+  const lines = [
+    `**Motion:** ${debate.motion || '(none)'}`,
+    '',
+    `${sideSummary}. ${state.moves} move(s). ${(debate.terms || []).length} term(s) pinned.`,
+    '',
+    state.terms === 0 ? '' : '',
+    state.unpinnedTerms.length
+      ? `Terms left unpinned: ${state.unpinnedTerms.map((term) => term.term).join(', ')}. Say so in a comment if that was deliberate.`
+      : 'Every term was pinned before argument.',
+    state.unanswered.length
+      ? `Objections nobody answered: ${state.unanswered.map((move) => move.id).join(', ')}.`
+      : 'Every objection was answered.',
+    debate.adjudication?.state === 'decided'
+      ? `Decided by ${debate.adjudication.adjudicator}: ${debate.adjudication.decision || ''}`
+      : debate.adjudication?.state === 'unresolved'
+        ? 'Recorded as unresolved.'
+        : 'Still open.',
+    '',
+    `File: \`debates/${publishable.id}.json\``,
+    '',
+    'The debate was recorded with Witness, and the build lints it with the same rules',
+    'the editor applies. `node scripts/build.mjs` should pass before this is merged.',
+    '',
+    'By opening this pull request I confirm the moves I am adding are my own or are',
+    'quoted with a source, and that I have not altered anyone else\u2019s words.',
+  ].filter((line) => line !== undefined);
+
+  // Blank lines above are structural; collapse runs rather than losing breaks.
+  const body = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  return {
+    id: publishable.id,
+    path: `debates/${publishable.id}.json`,
+    /** Deterministic: same debate, same bytes, so a diff is about content only. */
+    json: `${JSON.stringify(publishable, null, 2)}\n`,
+    title: `Debate: ${debate.motion || publishable.id}`,
+    body,
+    errors,
+    warnings: findings.filter((finding) => finding.level === 'warn'),
+    at,
+  };
+}
+
+/**
  * The digest of a published set of debates.
  *
  * A reader should be able to name which revision of a published set they read,
