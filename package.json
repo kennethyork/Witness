@@ -1,0 +1,15 @@
+{
+  "name": "colophon",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "A cited term base for interfaith translation, plus a parity tracker for multi-language statements: every card records how each tradition renders a concept and what each rendering loses.",
+  "license": "AGPL-3.0-or-later",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs && node scripts/check-modules.mjs",
+    "test": "node scripts/check.mjs && node scripts/check-modules.mjs && node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}

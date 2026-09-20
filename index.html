@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colophon — no claim without a colophon</title>
+<meta name="description" content="A cited term base for interfaith translation. Every card records how each tradition renders a concept and what each rendering loses. Includes a parity tracker for multi-language statements.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./styles/base.css">
+<link rel="stylesheet" href="./styles/print.css" media="print">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site">
+  <div class="site-inner">
+    <p class="wordmark"><a href="#/">Colophon</a></p>
+    <p class="tagline">No claim without a colophon.</p>
+    <nav aria-label="Primary">
+      <a href="#/">Term base</a>
+      <a href="#/losses">Loss ledger</a>
+      <a href="#/matrix">By language</a>
+      <a href="#/compare">Compare</a>
+      <a href="#/drafts">Drafts</a>
+      <a href="#/about">About</a>
+      <span class="kbd" title="Command palette">⌘K</span>
+    </nav>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer class="site">
+  <div class="site-inner">
+    <p>Code AGPL-3.0. Data CC BY-SA 4.0. Cards state who said what, on what basis.</p>
+    <p class="boundary">This site is public and has no server. Term cards are public by design. Drafts and statements stay in your browser until you export them. Restorative justice case data is never hosted here, on any server, ever.</p>
+  </div>
+</footer>
+
+<noscript>
+  <p class="noscript">Colophon needs JavaScript to read and search the term base. The cards themselves are plain JSON and remain readable without it, in <code>data/terms/</code>.</p>
+</noscript>
+
+<script type="module" src="./app/main.js"></script>
+</body>
+</html>

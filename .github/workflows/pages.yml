@@ -1,0 +1,69 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The schema is the contract. This is where it is enforced.
+      - name: Install the schema validator
+        run: pip install jsonschema
+
+      - name: Validate every card against the schema
+        run: python3 scripts/validate_cards.py data/terms schema/term-card.schema.json
+
+      - name: Tests (hashing, determinism, search, parity, exports)
+        run: node scripts/check.mjs
+
+      # The app modules cannot be imported without a DOM, so this parses the
+      # module graph instead: a renamed export or a missing service worker entry
+      # would otherwise only surface when a visitor opened the page.
+      - name: Static checks (module graph, service worker)
+        run: node scripts/check-modules.mjs
+
+      # Also lints, and fails the build rather than publishing a card that
+      # claims a loss it does not state.
+      - name: Build the site
+        run: node scripts/build.mjs
+
+      - name: Show the published digest
+        run: grep -m1 '"digest"' _site/data/terms.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

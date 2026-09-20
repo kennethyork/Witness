@@ -1,0 +1,8 @@
+# Normalise text to LF in the repository. The published digest is computed from
+# parsed JSON, so line endings cannot change it — but a repo whose argument is
+# reproducible bytes should not grow phantom diffs on a Windows contributor's
+# machine, and a citation should not depend on which machine edited a card.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary

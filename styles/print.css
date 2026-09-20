@@ -1,0 +1,74 @@
+/* Print.
+   These documents get read on paper, filed, and signed. The print stylesheet is
+   a first-class output, not an afterthought: it hides the chrome, keeps a card
+   from breaking across pages mid-rendition, and prints the digest, because a
+   citation that does not travel with the page is not a citation.
+
+   The results list, the loss ledger, the statement record and its approval
+   tables all print. Anything you would take into a room should survive the
+   printer. */
+
+@page { margin: 18mm 16mm; }
+
+body {
+  background: #fff;
+  color: #000;
+  font-size: 10.5pt;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* Interactive chrome that has no meaning on paper. */
+.site, .skip, .toast, .palette, .search, .filters, .count, .crumb, .noscript,
+button, .actions, .sticky-actions, .matched, .compare-controls, .progress,
+.progress-track, .repeatable .add, .field > label, .field-hint, .kbd,
+[role="status"] { display: none !important; }
+
+main { max-width: none; padding: 0; margin: 0; }
+
+.cards { border: 0; }
+.card-item { break-inside: avoid; page-break-inside: avoid; }
+.card-item > a { padding: 0.4rem 0; text-decoration: none; }
+
+.term-title { font-size: 19pt; }
+.term-gloss { font-size: 11pt; }
+
+.rendition, .disputes > li, .sources > li, .message, .loss-list > li,
+.parity-row, .draft-item, .stat { break-inside: avoid; page-break-inside: avoid; }
+.rendition { border-inline-start: 2pt solid #999; }
+
+.alternatives > summary { list-style: none; }
+.alternatives > ul { margin-block: 0.3rem; }
+
+a { color: #000; text-decoration: none; }
+a[href^="#/term/"]::after,
+.compare-column .crumb a::after { content: ""; }
+
+/* Tables need rules on paper, where there is no subtle background to lean on. */
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+th, td { border: 0.5pt solid #999; padding: 3pt 5pt; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+.cell-empty { color: #999; }
+.cell-ok, .cell-warn, .cell-alert, .cell-muted, .status, .chip, .lang { color: #000; }
+.shared { background: #f2f2f2; }
+
+/* Status is carried by the word, not by colour, on a black-and-white page. */
+.status, .chip, .lang { border: 0.5pt solid #666; }
+
+.section { margin-block-start: 10pt; }
+h3 { font-size: 12pt; margin-block-end: 3pt; }
+h2 { font-size: 15pt; }
+
+/* The colophon block must survive to paper, unclipped. */
+.colophon-block { border-block-start: 1pt solid #999; padding-block-start: 6pt; }
+
+.stats { display: flex; gap: 10pt; }
+.stat-value { font-size: 13pt; }
+.stat-label { font-size: 8pt; }
+
+.findings { border: 0.5pt solid #666; }
+.finding-path { font-family: monospace; font-size: 8pt; }
+
+/* Approvals are the point of a statement. Never let one be clipped. */
+.approval-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4pt; }
+textarea, input { border: 0; padding: 0; font-size: 10.5pt; }

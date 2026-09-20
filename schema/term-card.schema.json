@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "term-card.schema.json",
+  "title": "Interfaith term card",
+  "description": "A single concept, how each tradition renders it, and what is lost in each rendering. 'No equivalent' is a first-class citable claim, not a failure state.",
+  "type": "object",
+  "required": ["id", "concept", "renditions", "sources"],
+  "additionalProperties": false,
+  "$defs": {
+    "lang": {
+      "type": "string",
+      "description": "BCP 47 language tag.",
+      "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Where a claim comes from. No claim may appear without one.",
+      "required": ["citation", "language"],
+      "additionalProperties": false,
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "edition": { "type": "string" },
+        "tradition": { "type": "string" },
+        "language": { "$ref": "#/$defs/lang" },
+        "locator": {
+          "type": "string",
+          "description": "Verse, chapter, page, or timestamp."
+        },
+        "accessed": { "type": "string", "format": "date" }
+      }
+    },
+    "contributor": {
+      "type": "object",
+      "required": ["name", "date"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "contact": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "tradition": { "type": "string" },
+        "role": {
+          "type": "string",
+          "enum": ["author", "reviewer", "translator", "advisor"]
+        }
+      }
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable slug. Never reused, never renumbered.",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "concept": {
+      "type": "object",
+      "description": "The thing being named, described in plain modern language.",
+      "required": ["label", "gloss"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "gloss": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One or two sentences, tradition-neutral where possible."
+        },
+        "register": {
+          "type": "string",
+          "description": "Devotional, juridical, poetic, honorific, technical, ..."
+        },
+        "domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "e.g. covenant, mercy, ritual purity, almsgiving"
+        },
+        "related": {
+          "type": "array",
+          "description": "Other term card ids.",
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "description": "The term as it appears in its own language, if there is one.",
+      "additionalProperties": false,
+      "properties": {
+        "language": { "$ref": "#/$defs/lang" },
+        "term": { "type": "string" },
+        "script": {
+          "type": "string",
+          "description": "e.g. Arab, Hebr, Deva, Latn. Needed for correct rendering."
+        },
+        "transliteration": { "type": "string" },
+        "pronunciation": { "type": "string" }
+      }
+    },
+    "renditions": {
+      "type": "array",
+      "minItems": 1,
+      "description": "How this concept is carried into (or refuses to be carried into) each target language.",
+      "items": {
+        "type": "object",
+        "required": ["language", "rendering", "status", "basis"],
+        "additionalProperties": false,
+        "properties": {
+          "language": { "$ref": "#/$defs/lang" },
+          "tradition": { "type": "string" },
+          "rendering": {
+            "type": "string",
+            "description": "The word or phrase actually used. Use the null-rendering marker for 'do not translate'."
+          },
+          "script": { "type": "string" },
+          "transliteration": { "type": ["string", "null"] },
+          "status": {
+            "type": "string",
+            "enum": [
+              "equivalent",
+              "nearest-no-equivalent",
+              "transliterate-only",
+              "do-not-translate",
+              "contested",
+              "undefined"
+            ]
+          },
+          "loss": {
+            "type": "string",
+            "description": "What the rendering drops, adds, or distorts. Required whenever status is not 'equivalent'."
+          },
+          "basis": { "$ref": "#/$defs/provenance" },
+          "alternatives": {
+            "type": "array",
+            "description": "Rejected renderings and why, so the same debate isn't relitigated.",
+            "items": {
+              "type": "object",
+              "required": ["rendering", "rejected_because"],
+              "additionalProperties": false,
+              "properties": {
+                "rendering": { "type": "string" },
+                "rejected_because": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "if": {
+          "properties": { "status": { "enum": ["nearest-no-equivalent", "contested", "undefined"] } },
+          "required": ["status"]
+        },
+        "then": { "required": ["loss"] }
+      }
+    },
+    "disputes": {
+      "type": "array",
+      "description": "Open disagreement between traditions or within one. Recorded, not resolved.",
+      "items": {
+        "type": "object",
+        "required": ["position", "held_by", "basis"],
+        "additionalProperties": false,
+        "properties": {
+          "position": { "type": "string", "minLength": 1 },
+          "held_by": { "type": "string" },
+          "response": { "type": "string" },
+          "basis": { "$ref": "#/$defs/provenance" }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/provenance" },
+      "description": "Sources for the card as a whole. Every card cites something real."
+    },
+    "contributors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/contributor" }
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX expression. Contributions must be compatible.",
+      "default": "CC-BY-SA-4.0"
+    },
+    "provenance_note": {
+      "type": "string",
+      "description": "Free text on how this card came to exist, including who was consulted and who was not."
+    }
+  }
+}

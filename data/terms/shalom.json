@@ -1,0 +1,126 @@
+{
+  "id": "shalom",
+  "concept": {
+    "label": "shalom",
+    "gloss": "Peace understood as completeness and right relation: not the absence of conflict but the presence of wholeness in a person, a community, or a relationship.",
+    "register": "covenantal, liturgical, everyday greeting",
+    "domains": ["peace", "covenant", "wholeness", "justice"],
+    "related": ["hesed", "covenant"]
+  },
+  "origin": {
+    "language": "he",
+    "term": "שָׁלוֹם",
+    "script": "Hebr",
+    "transliteration": "shalom"
+  },
+  "renditions": [
+    {
+      "language": "en",
+      "tradition": "modern English translations",
+      "rendering": "peace",
+      "status": "nearest-no-equivalent",
+      "loss": "English 'peace' is largely negative and private: the absence of war, noise, or disturbance. Shalom is positive and material. It includes health, sufficiency, safety, and right relation, so a community with no open conflict but no justice is not in shalom.",
+      "basis": {
+        "citation": "NRSV, Numbers 6:26, rendering the Hebrew shalom in the priestly blessing as 'peace'",
+        "language": "en",
+        "locator": "Numbers 6:24-26"
+      }
+    },
+    {
+      "language": "en",
+      "tradition": "modern English translations",
+      "rendering": "welfare",
+      "status": "nearest-no-equivalent",
+      "loss": "Keeps the material dimension that 'peace' drops, but reads as civic administration. The relational and liturgical resonance disappears, and nothing in the word suggests a state of wholeness.",
+      "basis": {
+        "citation": "NRSV, Jeremiah 29:7, 'seek the welfare of the city', rendering shalom",
+        "language": "en",
+        "locator": "Jeremiah 29:7"
+      }
+    },
+    {
+      "language": "grc",
+      "tradition": "Jewish, Hellenistic",
+      "rendering": "εἰρήνη",
+      "script": "Grek",
+      "transliteration": "eirēnē",
+      "status": "nearest-no-equivalent",
+      "loss": "Classical eirēnē can mean a settled and prosperous condition, so the fit is better than Latin, but in the New Testament it is increasingly read as the opposite of conflict. The communal-justice sense thins.",
+      "basis": {
+        "citation": "Septuagint, rendering of shalom in the Psalms and prophets",
+        "tradition": "Jewish, Hellenistic",
+        "language": "grc"
+      }
+    },
+    {
+      "language": "la",
+      "tradition": "Christian, Western",
+      "rendering": "pax",
+      "script": "Latn",
+      "status": "nearest-no-equivalent",
+      "loss": "In Roman usage pax is order secured by victory and the absence of resistance (pax Romana). Importing it can recast shalom as imposed tranquillity, which is close to its opposite. The word carries the empire's voice.",
+      "basis": {
+        "citation": "Jerome, Vulgate, rendering of shalom; classical Latin usage of pax in the imperial sense",
+        "tradition": "Christian, Western",
+        "language": "la"
+      }
+    },
+    {
+      "language": "ar",
+      "tradition": "Islamic",
+      "rendering": "سَلَام",
+      "script": "Arab",
+      "transliteration": "salām",
+      "status": "nearest-no-equivalent",
+      "loss": "A cognate rather than a translation: both descend from the Semitic root sh-l-m, so the overlap is unusually deep. But the Arabic field is shaped by its relation to islām, from the same root, and by Qur'anic usage of as-Salām as a name of God. Deep overlap is not identity, and treating cognates as equivalent hides where the senses part.",
+      "basis": {
+        "citation": "Qur'an 59:23, as-Salām as a name of God; Semitic root sh-l-m",
+        "tradition": "Islamic",
+        "language": "ar"
+      }
+    }
+  ],
+  "disputes": [
+    {
+      "position": "In the priestly blessing and in everyday greeting, shalom is a blessing and a formula rather than a description of conditions. Reading it as a report about the world misreads its function.",
+      "held_by": "liturgical and pragmatic readings of the biblical text",
+      "response": "The same word is used descriptively of a city's conditions in Jeremiah 29:7, which suggests one word with several functions assigned by context rather than a lexical split.",
+      "basis": {
+        "citation": "Numbers 6:24-26 against Jeremiah 29:7",
+        "language": "he"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Numbers 6:24-26, the priestly blessing",
+      "language": "he",
+      "locator": "Numbers 6:24-26",
+      "tradition": "Jewish"
+    },
+    {
+      "citation": "Jeremiah 29:7, 'seek the shalom of the city'",
+      "language": "he",
+      "locator": "Jeremiah 29:7"
+    },
+    {
+      "citation": "1 Chronicles 22:9, where Solomon's name is derived from shalom",
+      "language": "he",
+      "locator": "1 Chronicles 22:9"
+    },
+    {
+      "citation": "Strong's Hebrew lexicon H7965",
+      "language": "en",
+      "tradition": "lexical"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Example contributor",
+      "date": "2026-09-20",
+      "role": "author"
+    }
+  ],
+  "license": "CC-BY-SA-4.0",
+  "provenance_note": "Seed card. Reviewed by no one and consulted with no community. Treat every claim as unverified until a named reviewer in the relevant tradition signs it. The Arabic rendering in particular needs a reviewer competent in Qur'anic usage."
+}

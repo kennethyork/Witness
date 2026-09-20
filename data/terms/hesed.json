@@ -1,0 +1,121 @@
+{
+  "id": "hesed",
+  "concept": {
+    "label": "hesed",
+    "gloss": "The loyalty, generosity, and reliability that bind parties in a covenant to one another; love expressed as kept obligation rather than felt affection.",
+    "register": "covenantal, devotional, juridical-inflected",
+    "domains": ["covenant", "mercy", "loyalty", "obligation"],
+    "related": ["mercy", "covenant", "faithfulness"]
+  },
+  "origin": {
+    "language": "he",
+    "term": "חֶסֶד",
+    "script": "Hebr",
+    "transliteration": "ḥesed"
+  },
+  "renditions": [
+    {
+      "language": "en",
+      "tradition": "Anglican, early modern",
+      "rendering": "loving-kindness",
+      "status": "nearest-no-equivalent",
+      "loss": "Coins a new English word precisely because none existed. Over four centuries the compound has drifted toward sentiment, so modern readers hear warmth where the Hebrew carries obligation between covenant partners.",
+      "basis": {
+        "citation": "Coverdale Bible, Psalter (1535), first use of 'loving kindness'",
+        "tradition": "Christian, Reformed",
+        "language": "en"
+      }
+    },
+    {
+      "language": "en",
+      "tradition": "modern critical",
+      "rendering": "steadfast love",
+      "status": "nearest-no-equivalent",
+      "loss": "Preserves duration and reliability, which 'loving-kindness' loses, but drops the legal-covenantal dimension and remains a two-word phrase doing one Hebrew word's work.",
+      "basis": {
+        "citation": "New Revised Standard Version translation committee usage",
+        "tradition": "Christian, ecumenical",
+        "language": "en"
+      },
+      "alternatives": [
+        {
+          "rendering": "mercy",
+          "rejected_because": "Reduces a mutual covenant obligation to one party's pity, and hides the reciprocity that the Hebrew assumes."
+        },
+        {
+          "rendering": "grace",
+          "rejected_because": "Imports an unmerited-favour framework from a different theological vocabulary, foreclosing the question rather than translating it."
+        },
+        {
+          "rendering": "loyalty",
+          "rejected_because": "Closer to the covenant structure but strips the generosity; reads as contractual minimum rather than overflowing commitment."
+        }
+      ]
+    },
+    {
+      "language": "grc",
+      "tradition": "Jewish, Hellenistic",
+      "rendering": "ἔλεος",
+      "script": "Grek",
+      "transliteration": "eleos",
+      "status": "nearest-no-equivalent",
+      "loss": "Pity or compassion shown by a superior to an inferior. Substitutes a vertical emotion for a horizontal, mutually binding obligation, and this shift is inherited by most later European translations.",
+      "basis": {
+        "citation": "Septuagint, Psalms, predominant rendering of hesed",
+        "tradition": "Jewish, Hellenistic",
+        "language": "grc"
+      }
+    },
+    {
+      "language": "la",
+      "tradition": "Christian, Western",
+      "rendering": "misericordia",
+      "script": "Latn",
+      "status": "nearest-no-equivalent",
+      "loss": "Inherits the LXX's verticality and adds a heart-centred affective frame. The covenant partner disappears; the merciful lord and the pitiable supplicant remain.",
+      "basis": {
+        "citation": "Jerome, Vulgate, Psalms",
+        "tradition": "Christian, Western",
+        "language": "la"
+      }
+    }
+  ],
+  "disputes": [
+    {
+      "position": "The covenant frame is secondary; hesed is fundamentally an act of generous mercy that God extends without prior obligation.",
+      "held_by": "A strand of Christian systematic theology reading hesed through grace",
+      "response": "The Hebrew is used of human-to-human obligations too, which strains any reading that makes it purely unilateral.",
+      "basis": {
+        "citation": "Deuteronomy 7:9-12; 1 Samuel 20 (human hesed between David and Jonathan)",
+        "language": "he"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Ruth 1:8; 3:10 — hesed requested and praised between human parties",
+      "language": "he",
+      "locator": "Ruth 1:8, 3:10"
+    },
+    {
+      "citation": "Psalm 136 — the refrain 'ki le-olam hasdo' repeated through the psalm",
+      "language": "he",
+      "locator": "Psalm 136",
+      "tradition": "Jewish"
+    },
+    {
+      "citation": "Nelson Glueck, Das Wort hesed im alttestamentlichen Sprachgebrauche (1927) — the study that established the covenantal reading",
+      "language": "de",
+      "tradition": "Jewish, academic"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Example contributor",
+      "date": "2026-09-20",
+      "role": "author"
+    }
+  ],
+  "license": "CC-BY-SA-4.0",
+  "provenance_note": "Seed card. Reviewed by no one yet and consulted with no community yet; treat every claim as unverified until a named reviewer in the relevant tradition signs it."
+}

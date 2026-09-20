@@ -1,0 +1,143 @@
+{
+  "id": "dharma",
+  "concept": {
+    "label": "dharma",
+    "gloss": "The order that holds things together: at once cosmic law, the duty that follows from one's situation, the teaching that articulates that order, and the quality that makes a thing what it is.",
+    "register": "philosophical, juridical, devotional",
+    "domains": ["order", "duty", "teaching", "law"],
+    "related": ["karma", "covenant"]
+  },
+  "origin": {
+    "language": "sa",
+    "term": "धर्म",
+    "script": "Deva",
+    "transliteration": "dharma"
+  },
+  "renditions": [
+    {
+      "language": "en",
+      "tradition": "modern Western usage",
+      "rendering": "religion",
+      "status": "nearest-no-equivalent",
+      "loss": "'Religion' is a modern Western category organised around belief and a separable private sphere. Dharma is organised around duty, order, and practice, and does not divide into belief and secular life. The rendering can make Indian traditions look like denominations, and can make a colonial-era classification look native.",
+      "basis": {
+        "citation": "Wilfred Cantwell Smith, The Meaning and End of Religion (1962), on 'religion' as a modern reification",
+        "language": "en"
+      },
+      "alternatives": [
+        {
+          "rendering": "faith",
+          "rejected_because": "Narrows to interior conviction, which is the exact dimension dharma treats as least central."
+        },
+        {
+          "rendering": "law",
+          "rejected_because": "Preserves the binding force but imports a legislator and a code, neither of which the Sanskrit requires."
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "rendering": "duty",
+      "status": "nearest-no-equivalent",
+      "loss": "Captures svadharma, one's own particular duty, but drops the cosmic-order and teaching senses. It also reframes obligation as imposed from outside rather than as participation in an order one already belongs to.",
+      "basis": {
+        "citation": "Bhagavad Gita 3:35, on svadharma performed imperfectly being better than another's dharma performed well",
+        "language": "sa",
+        "locator": "Bhagavad Gita 3:35"
+      }
+    },
+    {
+      "language": "pi",
+      "tradition": "Buddhist",
+      "rendering": "dhamma",
+      "script": "Latn",
+      "transliteration": "dhamma",
+      "status": "nearest-no-equivalent",
+      "loss": "Buddhist usage shifts the weight away from social duty and toward the teaching and the law of causality, and toward dhammas as the constituents of experience. Hindu and Buddhist senses share a word and not an entirety of sense; assuming one covers the other is a recurring interfaith error.",
+      "basis": {
+        "citation": "Pali canon, Dhammapada, and the compound dhammacakka for the setting in motion of the teaching",
+        "tradition": "Buddhist",
+        "language": "pi"
+      }
+    },
+    {
+      "language": "zh",
+      "tradition": "Buddhist, East Asian",
+      "rendering": "法",
+      "script": "Hani",
+      "transliteration": "fǎ",
+      "status": "nearest-no-equivalent",
+      "loss": "Translators reached for an existing word meaning law or method. It carries the teaching sense well and the social-duty sense poorly, so the dimension that mattered most in the Indian context quietly dropped out of East Asian Buddhism. A translation choice that became doctrine.",
+      "basis": {
+        "citation": "Standard Chinese Buddhist rendering of dharma as 法, as in 佛法",
+        "tradition": "Buddhist",
+        "language": "zh"
+      }
+    },
+    {
+      "language": "bo",
+      "tradition": "Buddhist, Tibetan",
+      "rendering": "chos",
+      "script": "Tibt",
+      "transliteration": "chos",
+      "status": "nearest-no-equivalent",
+      "loss": "A term with no prior meaning of social duty, pressed into service for dharma. It carries the teaching sense and carries neither the cosmic-order nor the social-obligation senses that the Sanskrit holds together.",
+      "basis": {
+        "citation": "Standard Tibetan Buddhist rendering of dharma as chos",
+        "tradition": "Buddhist",
+        "language": "bo"
+      }
+    }
+  ],
+  "disputes": [
+    {
+      "position": "The social-duty sense is central enough that a rendering which drops it misrepresents the tradition, and translation into 'religion' or 'law' has done institutional harm.",
+      "held_by": "readings informed by post-colonial critique of the 'world religions' framework",
+      "response": "The term's centre of gravity varies by text and period, so naming any single sense as central overstates the case in the other direction.",
+      "basis": {
+        "citation": "The range of usage between the Vedic order concept ṛta and later juridical dharma literature",
+        "language": "sa"
+      }
+    },
+    {
+      "position": "Modern legal classification treats these traditions as denominations of one 'religion', which the traditions themselves do not do.",
+      "held_by": "colonial and post-colonial legal administration",
+      "response": "The classification is administrative rather than metaphysical, and the tool should record it as a fact about law rather than a fact about dharma.",
+      "basis": {
+        "citation": "Indian personal law statutes, whose definition of 'Hindu' extends to Buddhists, Jains, and Sikhs",
+        "language": "en",
+        "tradition": "legal"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "citation": "Bhagavad Gita 3:35, svadharma",
+      "language": "sa",
+      "locator": "Bhagavad Gita 3:35"
+    },
+    {
+      "citation": "Ṛg Veda, ṛta as the earlier term for cosmic order",
+      "language": "sa",
+      "tradition": "Vedic"
+    },
+    {
+      "citation": "Dhammapada",
+      "language": "pi",
+      "tradition": "Buddhist"
+    },
+    {
+      "citation": "Wilfred Cantwell Smith, The Meaning and End of Religion (1962)",
+      "language": "en"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Example contributor",
+      "date": "2026-09-20",
+      "role": "author"
+    }
+  ],
+  "license": "CC-BY-SA-4.0",
+  "provenance_note": "Seed card. Reviewed by no one and consulted with no community. The Chinese, Tibetan, and Pali renditions need reviewers who work in those languages and traditions. The legal claims are unsourced at the statute level and marked for verification."
+}
