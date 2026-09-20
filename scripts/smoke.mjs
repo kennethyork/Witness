@@ -14,9 +14,10 @@
  * and renders, which is exactly the class of bug that got through.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { baseDigest } from '../app/hash.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -254,9 +255,25 @@ globalThis.Blob = class { constructor(parts) { this.parts = parts; } };
 globalThis.URL.createObjectURL = () => 'blob:fake';
 globalThis.URL.revokeObjectURL = () => {};
 
-const termBase = JSON.parse(
-  await readFile(path.join(root, '_site', 'data', 'terms.json'), 'utf8')
-);
+// The term base is assembled here from the source cards rather than read from
+// _site/. An earlier version read the built bundle, which meant this check only
+// worked after a build had run -- it passed locally, where a _site was always
+// lying around, and died in CI with ENOENT because it was wired in before the
+// build step. A check that depends on another step having run first is a trap.
+const cardsDir = path.join(root, 'data', 'terms');
+const cardFiles = (await readdir(cardsDir)).filter((name) => name.endsWith('.json')).sort();
+const cards = [];
+for (const file of cardFiles) {
+  cards.push(JSON.parse(await readFile(path.join(cardsDir, file), 'utf8')));
+}
+const termBase = {
+  format: 'witness/term-base',
+  version: 1,
+  license: 'CC-BY-SA-4.0',
+  digest: baseDigest(cards),
+  count: cards.length,
+  cards,
+};
 globalThis.fetch = async () => ({
   ok: true,
   status: 200,
