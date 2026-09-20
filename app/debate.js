@@ -361,6 +361,14 @@ export function lintDebate(debate) {
     }
   }
 
+  // What the room did procedurally. Not arguments, so not moves, and not held
+  // to the rules about claims and warrants -- but still part of what happened.
+  for (const [index, entry] of (debate?.procedural || []).entries()) {
+    const where = `procedural[${index}]`;
+    if (!isText(entry?.kind)) at(`${where}.kind`, 'say what happened');
+    if (entry?.side && !sideIds.has(entry.side)) at(`${where}.side`, `unknown side "${entry.side}"`);
+  }
+
   const adjudication = debate?.adjudication || {};
   if (!ADJUDICATION_STATES.includes(adjudication.state)) {
     at('adjudication.state', `state must be one of: ${ADJUDICATION_STATES.join(', ')}`);
@@ -476,6 +484,17 @@ export function debateToMarkdown(debate) {
       lines.push(`*Answered by ${answers.map((answer) => moveLabel(debate, answer.id)).join('; ')}*`, '');
     }
   });
+
+  if ((debate.procedural || []).length) {
+    lines.push('## Points of information', '');
+    for (const entry of debate.procedural) {
+      const side = (debate.sides || []).find((candidate) => candidate.id === entry.side);
+      lines.push(
+        `- ${entry.phase || 'somewhere'} — raised by ${side?.name || entry.side || 'someone'}: ${entry.state || 'raised'}${entry.text ? ` — ${entry.text}` : ''}`
+      );
+    }
+    lines.push('');
+  }
 
   lines.push('## Where it stands', '');
   lines.push(

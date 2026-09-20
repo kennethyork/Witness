@@ -198,6 +198,22 @@ if (!/color-scheme:\s*light/.test(baseRules) || !/color-scheme:\s*dark/.test(bas
   fail('base.css: color-scheme is not declared for both themes, so form controls and scrollbars will not follow the chosen theme');
 }
 
+// 4e. Every link in the shell's navigation must point at a route that exists.
+//     A dead nav link is invisible to every other check here.
+const mainSource = await readFile(path.join(appDir, 'main.js'), 'utf8');
+const routesMatch = mainSource.match(/const ROUTES = \[([^\]]+)\]/);
+if (!routesMatch) {
+  fail('main.js: no ROUTES array to check the navigation against');
+} else {
+  const routes = routesMatch[1].split(',').map((entry) => entry.trim().replace(/^'|'$/g, ''));
+  for (const match of shell.matchAll(/href="#\/([^"?#]*)/g)) {
+    const head = match[1].split('/')[0];
+    if (head && !routes.includes(head)) {
+      fail(`index.html: the nav links to #/${head}, which is not a route in main.js`);
+    }
+  }
+}
+
 // 5. Every local file the shell references must exist.
 for (const match of shell.matchAll(/(?:href|src)="(\.\/[^"]+)"/g)) {
   const relative = match[1].replace(/^\.\//, '');

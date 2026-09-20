@@ -25,6 +25,8 @@ const KEYS = {
   cards: `${PREFIX}cards`,
   statements: `${PREFIX}statements`,
   debates: `${PREFIX}debates`,
+  /** The room currently open. One at a time, because a room is one room. */
+  session: `${PREFIX}session`,
   settings: `${PREFIX}settings`,
   recents: `${PREFIX}recents`,
 };
@@ -181,6 +183,29 @@ export function saveDebate(debate) {
 
 export function deleteDebate(id) {
   return write(KEYS.debates, loadDebates().filter((d) => d.id !== id));
+}
+
+// ----------------------------------------------------------------- the room
+
+/**
+ * The live room, if there is one.
+ *
+ * Deliberately not part of an archive: a room is a session, not a record. What
+ * it produces is a debate record, and that is what gets archived and exported.
+ * Reloading the page mid-debate should restore the room, which is why this is
+ * stored at all.
+ */
+export function loadSession() {
+  const stored = read(KEYS.session, null);
+  return stored && typeof stored === 'object' ? stored : null;
+}
+
+export function saveSession(session) {
+  return write(KEYS.session, session);
+}
+
+export function clearSession() {
+  return write(KEYS.session, null);
 }
 
 // -------------------------------------------------------------------- recents

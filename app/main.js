@@ -27,6 +27,10 @@ import {
   aboutView, messageView,
 } from './ui.js';
 import { cardEditorView, draftsView, statementEditorView, debateEditorView, settingsView, importView } from './editor.js';
+import { debateRoomView } from './room-view.js';
+import {
+  blankSession, sessionToDebate, motionsFor,
+} from './room.js';
 import {
   blankDebate, debateSlug, lintDebate, debateToMarkdown,
   stampChain, restampAll, contributionFor, mergeContribution,
@@ -36,6 +40,7 @@ import {
   loadStatements, saveStatement, deleteStatement,
   loadSettings, saveSettings, pushRecent,
   loadDebates, saveDebate, deleteDebate,
+  loadSession, saveSession, clearSession,
   storageAvailable, exportEverything, importEverything, migrateLegacyStorage,
 } from './store.js';
 
@@ -49,10 +54,11 @@ const state = {
   facetData: null,
   filters: { languages: new Set(), originLanguages: new Set(), statuses: new Set(), traditions: new Set() },
   query: '',
-  route: { name: 'index', params: new URLSearchParams() },
+  route: { name: 'room', params: new URLSearchParams() },
   drafts: [],
   statements: [],
   debates: [],
+  session: loadSession() || blankSession(),
   settings: loadSettings(),
   storageOk: storageAvailable(),
   results: [],
@@ -69,14 +75,22 @@ main.append(browse, view, toastNode);
 
 // -------------------------------------------------------------------- routing
 
-const ROUTES = ['term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'debate', 'import', 'settings', 'about'];
+const ROUTES = ['room', 'terms', 'term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'debate', 'import', 'settings', 'about'];
 
 function parseRoute() {
   const raw = location.hash.replace(/^#/, '') || '/';
   const [pathPart, queryPart = ''] = raw.split('?');
   const parts = pathPart.split('/').filter(Boolean);
   const params = new URLSearchParams(queryPart);
-  if (!parts.length) return { name: 'index', params };
+  if (!parts.length) {
+    // The room is the front door now, and the term base lives at #/terms. A
+    // link to a search, like #/?q=hesed, still belongs to the term base and
+    // still works: nothing that was ever cited should break because the home
+    // page changed.
+    const looksLikeSearch = ['q', 'languages', 'originLanguages', 'statuses', 'traditions']
+      .some((key) => params.has(key));
+    return { name: looksLikeSearch ? 'terms' : 'room', params };
+  }
   const [head, second] = parts;
   if (!ROUTES.includes(head)) return { name: 'notfound', params };
   return { name: head, id: second ? decodeURIComponent(second) : null, params };
@@ -209,7 +223,7 @@ function renderResults() {
   );
 
   // Keep the URL in step so the search is a link, without touching history.
-  if (state.route.name === 'index' && panel) {
+  if (state.route.name === 'terms' && panel) {
     const encoded = encodeSearch({ query: state.query, filters: state.filters });
     const target = `#/${encoded ? `?${encoded}` : ''}`;
     try {
@@ -221,15 +235,29 @@ function renderResults() {
   }
 }
 
+/**
+ * Swap the main view, giving the outgoing view a chance to clean up.
+ *
+ * The debating room owns a setInterval, and a view that leaks one keeps ticking
+ * against a detached DOM. Any future view with a timer, a socket, or an observer
+ * gets the same treatment for free.
+ */
+let disposeView = null;
+function setView(next, dispose = null) {
+  if (typeof disposeView === 'function') disposeView();
+  disposeView = dispose;
+  setView(next);
+}
+
 function render({ moveFocus = false, replacePanel = false } = {}) {
   if (!state.bundle) return;
 
   const route = state.route;
-  const isIndex = route.name === 'index';
-  browse.hidden = !isIndex;
-  view.hidden = isIndex;
+  const isTerms = route.name === 'terms';
+  browse.hidden = !isTerms;
+  view.hidden = isTerms;
 
-  if (isIndex) {
+  if (isTerms) {
     document.title = 'Witness — no claim without a witness';
     if (replacePanel || !panel) {
       if (panel) panel.node.remove();
@@ -252,11 +280,33 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
   if (panel) panel.input.blur();
 
   switch (route.name) {
+    case 'room': {
+      document.title = state.session?.motion
+        ? `${state.session.motion} — Witness`
+        : 'Debate room — Witness';
+      const roomView = debateRoomView({
+        session: state.session,
+        motions: motionsFor(state.cards),
+        onPersist: (session, message) => {
+          state.session = session;
+          saveSession(session);
+          if (message) toast(message);
+        },
+        onProduce: produceRecord,
+        onReset: () => {
+          state.session = blankSession();
+          clearSession();
+          render();
+        },
+      });
+      setView(roomView.node, roomView.dispose);
+      break;
+    }
     case 'term': {
       const card = state.cards.find((c) => c.id === route.id);
       if (!card) {
         document.title = 'No such card — Witness';
-        view.replaceChildren(messageView(
+        setView(messageView(
           'No such card',
           `No card in this revision of the term base has the id “${route.id}”. It may have been renamed, or the link may come from a different base revision.`,
           { tone: 'error' }
@@ -265,7 +315,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }
       document.title = `${card.concept.label} — Witness`;
       pushRecent(card.id);
-      view.replaceChildren(termView(card, {
+      setView(termView(card, {
         digest: state.digests.get(card.id),
         baseRevision: state.bundle.digest,
         cards: state.cards,
@@ -275,15 +325,15 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     }
     case 'losses':
       document.title = 'Loss ledger — Witness';
-      view.replaceChildren(lossesView(state.cards, { onExport: exportEverythingFor, actions: cardActions }));
+      setView(lossesView(state.cards, { onExport: exportEverythingFor, actions: cardActions }));
       break;
     case 'matrix':
       document.title = 'Concepts by language — Witness';
-      view.replaceChildren(matrixView(state.cards, cardActions));
+      setView(matrixView(state.cards, cardActions));
       break;
     case 'compare':
       document.title = 'Compare — Witness';
-      view.replaceChildren(compareView(state.cards, {
+      setView(compareView(state.cards, {
         a: route.params.get('a') || '',
         b: route.params.get('b') || '',
         actions: {
@@ -299,7 +349,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     case 'drafts':
       document.title = 'Your drafts — Witness';
-      view.replaceChildren(draftsView({
+      setView(draftsView({
         cards: state.drafts,
         statements: state.statements,
         debates: state.debates,
@@ -313,7 +363,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     case 'author': {
       const draft = route.id ? state.drafts.find((d) => d.id === route.id) : null;
       document.title = draft ? `Editing ${draft.concept.label || draft.id} — Witness` : 'New card — Witness';
-      view.replaceChildren(cardEditorView({
+      setView(cardEditorView({
         draft: draft || blankCard(),
         onSave: saveCardDraft,
         onExport: exportEverythingFor,
@@ -326,7 +376,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     case 'statement': {
       const statement = route.id ? state.statements.find((s) => s.id === route.id) : null;
       document.title = statement ? `${statement.title || statement.id} — Witness` : 'New statement — Witness';
-      view.replaceChildren(statementEditorView({
+      setView(statementEditorView({
         statement: statement || blankStatement(),
         cards: state.cards,
         onSave: saveStatementDraft,
@@ -340,7 +390,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       const openDebate = route.id ? state.debates.find((d) => d.id === route.id) : null;
       const working = openDebate || blankDebate();
       document.title = openDebate ? `${openDebate.motion || openDebate.id} — Witness` : 'New debate — Witness';
-      view.replaceChildren(debateEditorView({
+      setView(debateEditorView({
         debate: working,
         cards: state.cards,
         onSave: saveDebateDraft,
@@ -355,14 +405,14 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     }
     case 'import':
       document.title = 'Import — Witness';
-      view.replaceChildren(importView({
+      setView(importView({
         onImportText: importText,
         onCancel: () => go('/drafts'),
       }));
       break;
     case 'settings':
       document.title = 'Settings — Witness';
-      view.replaceChildren(settingsView({
+      setView(settingsView({
         settings: state.settings,
         onChange: changeSetting,
         onExportArchive: () => {
@@ -377,7 +427,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     case 'about':
       document.title = 'About — Witness';
-      view.replaceChildren(aboutView({
+      setView(aboutView({
         count: state.cards.length,
         baseRevision: state.bundle.digest,
         stats: statsFor(state.cards),
@@ -385,7 +435,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     default:
       document.title = 'Not found — Witness';
-      view.replaceChildren(messageView('No such page', 'That route does not exist.', { tone: 'error' }));
+      setView(messageView('No such page', 'That route does not exist.', { tone: 'error' }));
   }
 
   if (moveFocus) view.querySelector('h2')?.focus();
@@ -444,6 +494,27 @@ function saveStatementDraft(statement) {
     return;
   }
   toast('Saved on this device. Nothing was uploaded.');
+}
+
+/**
+ * The room has finished, so it becomes the record.
+ *
+ * The session is cleared afterwards: the room was the live thing, and what it
+ * produced is an editable record. Keeping both would mean two copies of the same
+ * debate drifting apart.
+ */
+function produceRecord(session) {
+  const record = sessionToDebate(session);
+  const result = saveDebate(record);
+  state.debates = loadDebates();
+  if (!result.ok) {
+    toast(result.error, { sticky: true, tone: 'error' });
+    return;
+  }
+  state.session = blankSession();
+  clearSession();
+  toast('The room is now a debate record. Nothing was uploaded.');
+  go(`/debate/${encodeURIComponent(record.id)}`);
 }
 
 function saveDebateDraft(debate) {
@@ -754,7 +825,8 @@ function buildPalette() {
   );
 
   const commands = [
-    { label: 'Term base', route: '/' },
+    { label: 'Debate room', route: '/' },
+    { label: 'Term base', route: '/terms' },
     { label: 'Loss ledger', route: '/losses' },
     { label: 'Concepts by language', route: '/matrix' },
     { label: 'Compare two concepts', route: '/compare' },
@@ -862,7 +934,7 @@ async function boot() {
   state.route = parseRoute();
   applySettings();
 
-  if (state.route.name === 'index') {
+  if (state.route.name === 'terms') {
     const decoded = decodeSearch(location.hash.split('?')[1] || '');
     state.query = decoded.query;
     state.filters = decoded.filters;
@@ -875,13 +947,13 @@ async function boot() {
     toast(`Moved ${migration.moved} stored item${migration.moved === 1 ? '' : 's'} over after the rename. Your drafts are intact.`);
   }
 
-  view.replaceChildren(messageView('Loading', 'Reading the published cards.'));
+  setView(messageView('Loading', 'Reading the published cards.'));
 
   try {
     state.bundle = await loadTermBase();
   } catch (error) {
     document.title = 'Witness — unavailable';
-    view.replaceChildren(messageView('The term base could not be loaded', error.message, { tone: 'error' }));
+    setView(messageView('The term base could not be loaded', error.message, { tone: 'error' }));
     return;
   }
 
@@ -905,7 +977,7 @@ window.addEventListener('hashchange', () => {
   // Navigating away from an open palette should not leave a scrim behind.
   if (palette?.isOpen()) palette.close();
   state.route = parseRoute();
-  if (state.route.name === 'index') {
+  if (state.route.name === 'terms') {
     const decoded = decodeSearch(location.hash.split('?')[1] || '');
     state.query = decoded.query;
     state.filters = decoded.filters;
@@ -947,7 +1019,7 @@ window.addEventListener('keydown', (event) => {
     const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
     if (typing) return;
     event.preventDefault();
-    if (state.route.name !== 'index') go('/');
+    if (state.route.name !== 'terms') go('/terms');
     requestAnimationFrame(() => document.getElementById('q')?.focus());
   }
 });

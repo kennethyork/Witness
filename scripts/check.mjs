@@ -26,6 +26,12 @@ import {
   moveDigest, termsDigest, transcriptDigest, verifyChain, stampChain,
   contributionFor, mergeContribution, restampAll,
 } from '../app/debate.js';
+import {
+  FORMATS, FORMAT_KEYS, SIDE_KEYS, blankSession, sessionId, suggestBurden,
+  phasesFor, currentPhase, formatClock, roomClock, advancePhase, lastPhase,
+  pointsRemaining, canRaisePoint, raisePoint, settlePoint,
+  addCard, removeCard, roomTally, sessionToDebate, sessionToMarkdown, motionsFor,
+} from '../app/room.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -835,6 +841,113 @@ check(
   debateWarnings({ ...debate, moves: [debate.moves[0], { ...debate.moves[1], side: 'pro' }, debate.moves[2]] })
     .some((f) => f.message.includes('previous move'))
 );
+
+// -------------------------------------------------------------- debating room
+
+const room = blankSession();
+room.motion = 'Rendering hesed as loving-kindness misleads a modern reader.';
+
+check('a new session starts on the first phase with a running clock at zero', room.phaseIndex === 0 && room.elapsed === 0);
+check('a motion suggests burdens for both sides', suggestBurden(room.motion, 'a').includes('Establish that'));
+check('the denying burden is not just the affirming one reversed', suggestBurden(room.motion, 'a') !== suggestBurden(room.motion, 'b'));
+check('every format has phases', FORMAT_KEYS.every((key) => FORMATS[key].phases.length > 0));
+check('format keys are stable', FORMAT_KEYS.join(',') === 'freeform,one-on-one,parliamentary');
+check('the clock formats minutes and seconds', formatClock(305) === '05:05' && formatClock(0) === '00:00');
+
+// The clock.
+room.formatKey = 'parliamentary';
+const first = roomClock(room);
+check('the room starts in prep, with no floor', first.phase.kind === 'prep' && first.floor === null && first.isOpen);
+check('the first phase counts down from its own length', first.remaining === FORMATS.parliamentary.phases[0].seconds);
+room.elapsed = 100;
+check('the clock counts down as time passes', roomClock(room).remaining === FORMATS.parliamentary.phases[0].seconds - 100);
+room.elapsed = FORMATS.parliamentary.phases[0].seconds + 12;
+const overrun = roomClock(room);
+check('time up is reported rather than silently wrapped', overrun.over === true && overrun.overrun === 12);
+check('and it shows how far over', overrun.text === '+00:12');
+check('advancing moves to the next phase and resets the clock', advancePhase(room) && room.phaseIndex === 1 && room.elapsed === 0);
+check('the floor is now the affirming side', roomClock(room).floor === 'a' && !roomClock(room).isOpen);
+check('the second phase in parliamentary debate takes two points', currentPhase(room).pointsAllowed === 2);
+
+// Points of information. The rule that keeps a room listening.
+room.elapsed = 5;
+check('no point may be raised in the opening seconds', !canRaisePoint(room, 'b').ok);
+check('and it says why', canRaisePoint(room, 'b').reason.includes('seconds in'));
+check('the side with the floor cannot raise points of information at their own speech', !canRaisePoint(room, 'a').ok);
+room.elapsed = 60;
+check('once the grace period has passed the opposition may raise one', canRaisePoint(room, 'b').ok);
+check('and it knows how many are left', pointsRemaining(room, 'b') === 2);
+const raised = raisePoint(room, 'b', { text: 'Is that true of the Septuagint?' });
+check('raising a point records it against the phase', raised.ok && room.points.length === 1);
+check('a raised point reduces what is left', pointsRemaining(room, 'b') === 1);
+raisePoint(room, 'b', { text: 'Second point.' });
+raisePoint(room, 'b', { text: 'Third point.' });
+check('no more than the phase allows', pointsRemaining(room, 'b') === 0);
+check('a further attempt is refused', !raisePoint(room, 'b', { text: 'Fourth.' }).ok);
+settlePoint(room, 'poi1', 'accepted');
+check('a point can be accepted or declined', room.points[0].state === 'accepted');
+check('settling a point that does not exist fails cleanly', !settlePoint(room, 'nope', 'accepted').ok);
+
+// Arguments: two fields, one keystroke.
+const noClaim = addCard(room, 'a', { support: 'something' });
+check('a card with no claim is refused', !noClaim.ok);
+const cardA = addCard(room, 'a', { claim: 'The compound drifts toward sentiment.', support: 'Coverdale coined it in 1535.' });
+check('adding an argument takes a claim and a reason', cardA.ok && room.cards.length === 1);
+check('the card records which phase it was made in', room.cards[0].phase === currentPhase(room).name);
+addCard(room, 'b', { claim: 'Readers meet the word with commentary.' });
+check('the tally counts arguments per side', roomTally(room).find((side) => side.key === 'a').cards === 1);
+check('and counts which of them had a reason given', roomTally(room).find((side) => side.key === 'b').withSupport === 0);
+check('a card can be removed', removeCard(room, cardA.card.id) === 1);
+
+// Conversion: the rules apply here, not in the room.
+addCard(room, 'a', { claim: 'The compound drifts toward sentiment.', support: 'Coverdale coined it in 1535.' });
+room.sides.a.burden = suggestBurden(room.motion, 'a');
+room.sides.b.burden = suggestBurden(room.motion, 'b');
+room.ballot = { judge: 'A named judge', decision: 'a', reasons: 'The affirmative showed the drift.' };
+const record = sessionToDebate(room);
+check('the room becomes a debate record', record.format === 'witness/debate' && record.moves.length === 2);
+check('the record has both sides with their burdens', record.sides.length === 2 && record.sides[0].burden.length > 0);
+check('arguments become moves in the order they were made', record.moves[1].claim.includes('drifts toward sentiment'));
+check('the reason given becomes the warrant', record.moves[1].warrant.includes('Coverdale'));
+check('every card becomes an argument, whatever phase it was made in', record.moves.every((move) => move.kind === 'argument'));
+check('no evidence is invented', record.moves.every((move) => move.evidence.length === 0));
+check('points of information are carried across as procedure, not as arguments', record.procedural.length === 2);
+check('the ballot becomes an adjudication by a named person', record.adjudication.state === 'decided' && record.adjudication.adjudicator === 'A named judge');
+check('the converted record passes lint with no errors', debateErrors(record).length === 0, JSON.stringify(debateErrors(record)));
+check(
+  'and it warns that the room cited nothing, which is the honest account',
+  debateWarnings(record).some((f) => f.message.includes('cites nothing'))
+);
+
+const noBallot = sessionToDebate({ ...blankSession(), motion: room.motion, sides: room.sides, cards: room.cards });
+check('a room with no ballot is recorded as unresolved, not decided', noBallot.adjudication.state === 'unresolved');
+
+const roomMarkdown = sessionToMarkdown(room);
+check('the session transcript names both sides', roomMarkdown.includes('affirms') && roomMarkdown.includes('denies'));
+check('the session transcript lists the points of information', roomMarkdown.includes('Points of information'));
+check('the session transcript records the ballot', roomMarkdown.includes('A named judge'));
+check('the session transcript refuses to invent a decision when there is none', sessionToMarkdown(blankSession()).includes('No decision recorded'));
+check('sessionId derives from the motion', sessionId(room) === 'rendering-hesed-as-loving-kindness-misleads-a-modern-reader');
+check('advancePhase stops at the end', (() => {
+    const walk = blankSession();
+    let steps = 0;
+    while (advancePhase(walk) && steps < 50) steps += 1;
+    return steps === phasesFor(walk).length - 1 && lastPhase(walk);
+  })());
+
+// Motions drawn from the term base: a base is a poor home page and a good
+// source of things to argue about.
+const suggested = motionsFor(cards);
+check('motions are drawn from the cards', suggested.length > 0);
+check('a motion is a proposition, not a topic', suggested.every((motion) => motion.includes(' ') && motion.length > 20));
+check('a recorded loss becomes a motion about the rendering', suggested.some((motion) => /Rendering/.test(motion)));
+check('no raw language codes leak into a motion a person has to read aloud', !suggested.some((motion) => /\binto [a-z]{2}\b|\[(en|he|ar|grc|la)\]/.test(motion)));
+check('and each card also offers the untranslatable claim', suggested.some((motion) => /is untranslatable/.test(motion)));
+check('motions respect the limit', motionsFor(cards, { limit: 2 }).length === 2);
+check('no motions from an empty base', motionsFor([]).length === 0);
+check('a card with no label is skipped rather than crashing', motionsFor([{ renditions: [] }]).length === 0);
+
+
 
 // ------------------------------------------------------------------ report
 

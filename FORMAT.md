@@ -162,6 +162,24 @@ signatures would close the fabrication gap, and they are the upgrade path — th
 need a secure context and a key-management story that a static folder does not
 have.
 
+### From the room
+
+A live session (a room) is not a record. `sessionToDebate` converts one at the
+end: motion, sides and burdens carry over, every argument card becomes a move of
+kind `argument`, points of information become `procedural` entries rather than
+arguments, and the ballot becomes the adjudication.
+
+Two deliberate consequences:
+
+- **Nothing is invented.** The reason a side gave becomes the move's `warrant`;
+  evidence is left empty, so a room that cited nothing produces a record that
+  says so. That warning is the point, not a defect.
+- **A room with no ballot becomes `unresolved`**, never `decided`. Silence is not
+  a verdict.
+
+The session itself is deliberately outside an archive: it is a live thing, and
+what it produces is the record.
+
 `Re-stamp everything` exists for one case: you wrote a move, saved it, spotted a
 typo, and have not sent it. It recomputes the whole chain and therefore cannot
 tell a correction from a rewrite, so it is never automatic, it says so in the

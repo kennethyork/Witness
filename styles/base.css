@@ -423,6 +423,94 @@ body.palette-open { overflow: hidden; }
 .toast.error { background: var(--rubric); color: var(--on-highlight); }
 .citation-block { margin: 0.5rem 0 0; white-space: pre-wrap; font-size: 0.8rem; }
 
+/* ------------------------------------------------------------ the room
+   The clock is the largest thing on the page, because in a room the clock is
+   what everyone is looking at. */
+
+.room { display: grid; gap: 1rem; }
+.room-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem 1.2rem; }
+.room-motion { font-family: var(--font-text); font-size: 1.5rem; margin: 0; flex: 1 1 22rem; }
+.room-head .actions { margin: 0; }
+
+.room-phase { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.room-phase-name { font-family: var(--font-text); font-size: 1.05rem; }
+
+.room-clock {
+  display: grid; justify-items: center; gap: 0.1rem;
+  padding: 1rem; border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+.room-time {
+  font-family: var(--font-mono); font-size: clamp(3rem, 12vw, 6rem);
+  line-height: 1; margin: 0; font-variant-numeric: tabular-nums;
+}
+.room-whose { margin: 0; font-family: var(--font-text); font-size: 1.15rem; }
+.room-left { margin: 0; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.room-clock.over { border-color: var(--rubric); }
+.room-clock.over .room-time { color: var(--rubric); }
+
+.room-columns { display: grid; gap: 1.2rem; }
+@media (min-width: 52rem) { .room-columns { grid-template-columns: 1fr 1fr; align-items: start; } }
+
+.room-column {
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 0.9rem 1rem 1rem; background: var(--paper-raised);
+  transition: box-shadow 120ms ease;
+}
+/* Whose floor it is, visible at a glance from across a room. */
+.room-column.has-floor { box-shadow: inset 4px 0 0 var(--rubric); border-color: var(--rule-strong); }
+.room-column-head h3 { margin: 0; font-size: 1.3rem; }
+.room-position { margin: 0.1rem 0 0.5rem; font-size: 0.8rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.room-burden { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--ink-soft); max-width: 40ch; }
+.room-burden.empty { color: var(--accent-warn); }
+.room-tally { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0 0 0.8rem; }
+
+.room-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.room-card {
+  display: flex; gap: 0.6rem; justify-content: space-between; align-items: flex-start;
+  border-inline-start: 3px solid var(--rule-strong); padding: 0.35rem 0 0.35rem 0.7rem;
+}
+.room-card-claim { margin: 0; font-family: var(--font-text); font-size: 1.05rem; }
+.room-card-support { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--ink-soft); }
+.room-card-support.empty { color: var(--ink-faint); font-style: italic; }
+.room-card-tools { display: grid; justify-items: end; gap: 0.2rem; flex-shrink: 0; }
+
+.room-add { display: grid; grid-template-columns: 1fr; gap: 0.35rem; margin-block-start: 0.8rem; }
+@media (min-width: 34rem) { .room-add { grid-template-columns: 1fr 1fr auto; align-items: center; } }
+.room-add input { width: 100%; }
+
+.room-points { display: grid; gap: 0.5rem; margin-block-end: 0.8rem; }
+.room-point {
+  border: 1px solid var(--rubric); border-radius: var(--radius);
+  padding: 0.5rem 0.7rem; font-size: 0.92rem;
+}
+.room-point strong { font-family: var(--font-text); }
+.room-point span { color: var(--ink-soft); }
+.room-point .actions { margin: 0.4rem 0 0; }
+
+.room-point-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-block-start: 0.7rem; }
+.room-poi-why { font-size: 0.78rem; color: var(--ink-faint); }
+.room-poi-form { display: flex; gap: 0.4rem; margin-block-start: 0.5rem; }
+
+.room-formats { display: grid; gap: 0.7rem; }
+.room-format {
+  display: grid; gap: 0.15rem; padding: 0.7rem 0.9rem;
+  border: 1px solid var(--rule); border-radius: var(--radius); cursor: pointer;
+}
+.room-format.chosen { border-color: var(--rubric); box-shadow: inset 3px 0 0 var(--rubric); }
+.room-format input { position: absolute; opacity: 0; pointer-events: none; }
+.room-format-name { font-family: var(--font-text); font-size: 1.05rem; }
+.room-format-desc { font-size: 0.88rem; color: var(--ink-soft); }
+.room-format-phases { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }
+
+.room-sides { display: grid; gap: 1rem; }
+@media (min-width: 40rem) { .room-sides { grid-template-columns: 1fr 1fr; } }
+.room-suggestions ul { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0; padding: 0; }
+.room-decisions { display: grid; gap: 0.3rem; margin-block: 0.6rem; }
+.room-decision { display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+
+/* Print the room as a transcript, not as a control panel. */
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

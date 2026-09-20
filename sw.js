@@ -10,7 +10,7 @@
  * included. A stale stylesheet is indistinguishable from a bug.
  */
 
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = `witness-${VERSION}`;
 
 const ASSETS = [
@@ -28,6 +28,8 @@ const ASSETS = [
   './app/forms.js',
   './app/ui.js',
   './app/editor.js',
+  './app/room.js',
+  './app/room-view.js',
   './app/terms.js',
   './app/search.js',
   './app/hash.js',

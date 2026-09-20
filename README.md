@@ -26,6 +26,20 @@ The domain has a mature precedent for primitives 2 and 3: multilingual legal dra
 
 ## What it does
 
+**Debate** — the front door is a room, not a reference book:
+
+- **A motion, two sides, a clock.** Pick or write a proposition, pick a format (freeform, one on one, parliamentary), name the sides. Motions can be drawn from the term base: every recorded loss is an argument waiting to be had.
+- **The clock is the largest thing on the page**, because in a room the clock is what everyone is looking at. Prep, speaking time, time-up shown honestly as an overrun rather than silently wrapped.
+- **Phases with a floor.** Whose turn it is, highlighted at a glance, with next/back so the chair can correct a mistake.
+- **Adding an argument takes two fields and Enter.** Claim and the reason given. Anything slower and people stop typing while they are speaking, which is when an app stops being useful.
+- **Points of information**, with the rules that make them work: only during the other side's speech, not in the first twenty seconds, no more than the phase allows. The speaker accepts or declines.
+- **A ballot at the end** from a named judge, or "nobody moved".
+- **The rules do not gate the room.** Nothing is refused mid-argument. The room converts to a debate record afterwards, and *that* is where the rules apply — so a group argues freely and then reads an honest account of what they did, including that they cited nothing. Strict afterwards, easy during.
+
+This is the opposite of the rest of the app, deliberately. The term base, the statement tracker, and the debate *record* are all for recording what happened. The room is for happening.
+
+## What it records
+
 **Read** — a term base you can actually interrogate:
 
 - **Search** across terms, glosses, sources, and the recorded losses, not just the words. Quoted phrases kept whole, every token must match.
