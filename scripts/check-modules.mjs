@@ -214,6 +214,63 @@ if (!routesMatch) {
   }
 }
 
+// 4f. A function whose own statement is an unconditional call to itself never
+//     returns. A scripted find-and-replace once rewrote a helper's body into a
+//     call to itself, and every render blew the stack while every static check
+//     stayed green. scripts/smoke.mjs is the real safety net for that class of
+//     bug; this is the cheap, precise version of the same idea.
+//
+//     Precision matters more than reach here. A re-render helper legitimately
+//     calls itself from inside an event handler, and a recursive helper
+//     legitimately calls itself inside an expression. Both are nested, so both
+//     are ignored: only a call at the function's own level counts. A check that
+//     cries wolf is worse than no check.
+const topLevelOnly = (body) => {
+  let depth = 0;
+  let out = '';
+  for (const character of body) {
+    if ('{(['.includes(character)) {
+      // Keep a delimiter that opens at the top level: blanking it would leave
+      // `name` followed by nothing, and the call pattern needs its paren.
+      out += depth === 0 ? character : ' ';
+      depth += 1;
+      continue;
+    }
+    if ('})]'.includes(character)) {
+      depth -= 1;
+      out += depth === 0 ? character : ' ';
+      continue;
+    }
+    out += depth === 0 ? character : ' ';
+  }
+  return out;
+};
+
+for (const file of files) {
+  const source = sources.get(file);
+  for (const match of source.matchAll(/function\s+([A-Za-z0-9_$]+)\s*\(/g)) {
+    const name = match[1];
+    const braceStart = source.indexOf('{', match.index);
+    if (braceStart === -1) continue;
+
+    let depth = 0;
+    let end = -1;
+    for (let index = braceStart; index < source.length; index += 1) {
+      if (source[index] === '{') depth += 1;
+      else if (source[index] === '}') {
+        depth -= 1;
+        if (depth === 0) { end = index; break; }
+      }
+    }
+    if (end === -1) continue;
+
+    const skeleton = topLevelOnly(source.slice(braceStart + 1, end));
+    if (new RegExp(`^[ \\t]*${name}\\s*\\(`, 'm').test(skeleton)) {
+      fail(`${file}: ${name}() calls itself as its own statement, which recurses without end`);
+    }
+  }
+}
+
 // 5. Every local file the shell references must exist.
 for (const match of shell.matchAll(/(?:href|src)="(\.\/[^"]+)"/g)) {
   const relative = match[1].replace(/^\.\//, '');

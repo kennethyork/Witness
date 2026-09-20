@@ -44,6 +44,13 @@ jobs:
       - name: Static checks (module graph, service worker)
         run: node scripts/check-modules.mjs
 
+      # Boots the real app in a fake DOM and walks every route. The two suites
+      # above cannot see a runtime error in the DOM-only modules, and one
+      # shipped: a helper rewritten into a call to itself, so nothing rendered
+      # at all while every static check still passed.
+      - name: Smoke test (boot the app, walk every route)
+        run: node scripts/smoke.mjs
+
       # Also lints, and fails the build rather than publishing a card that
       # claims a loss it does not state.
       - name: Build the site

@@ -96,8 +96,9 @@ Clearing browser data deletes local drafts. That is the point — and it is why 
 
 ```bash
 node scripts/check.mjs          # hashing, determinism, search, lint, parity, exports
-node scripts/check-modules.mjs  # module graph and service worker integrity
+node scripts/check-modules.mjs  # module graph, service worker, nav links, stylesheet hazards
 node scripts/build.mjs          # lint + build into _site/
+node scripts/smoke.mjs          # boot the app in a fake DOM and walk every route
 node scripts/serve.mjs          # http://localhost:8080, serving _site/
 ```
 
@@ -156,6 +157,7 @@ scripts/validate_cards.py   real JSON Schema validation, used in CI
 scripts/build.mjs           deterministic build
 scripts/check.mjs           136 logic checks, no framework
 scripts/check-modules.mjs   static module-graph checks for the browser-only code
+scripts/smoke.mjs           boots the app against a fake DOM and walks every route
 scripts/serve.mjs           a dev server that survives malformed requests
 ```
 

@@ -246,7 +246,7 @@ let disposeView = null;
 function setView(next, dispose = null) {
   if (typeof disposeView === 'function') disposeView();
   disposeView = dispose;
-  setView(next);
+  view.replaceChildren(next);
 }
 
 function render({ moveFocus = false, replacePanel = false } = {}) {
