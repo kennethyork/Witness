@@ -551,6 +551,11 @@ export function aboutView({ count, baseRevision, stats }) {
       el('li', { text: 'Not a place for case data. See below.' })
     ),
 
+    el('h3', { text: 'What this is not the first to do' }),
+    el('p', { text: 'Structured argument tooling goes back to IBIS in 1970. Kialo, the category leader in text debate, already declines to pick a winner, so that is not the innovation here. Encyclopedias of pro and con arguments exist. Cassin\u2019s Dictionary of Untranslatables does the term-base idea superbly, in print, across a dozen languages. IATE, UNTERM and TERMIUM Plus are the institutional multilingual terminology databases this imitates \u2014 and they standardise translations rather than recording what each one loses.' }),
+    el('p', { text: 'What I could not find anyone doing: recording the loss as citable data across traditions; pinning terms before an argument starts; requiring an objection to restate what it attacks; and working with no accounts and no server at all.' }),
+    el('p', { text: 'One warning worth passing on. Wikidebate, the Wikimedia structured-debate project, was discontinued in 2026 for want of moderation and policy. It died of governance rather than technology, which is the risk that matters here more than any competitor.' }),
+
     el('h3', { text: 'The line that cannot be crossed' }),
     el('p', { text: 'This site is public and its repository is public. Nothing here is confidential.' }),
     el('ul', {},

@@ -63,7 +63,7 @@ This is the opposite of the rest of the app, deliberately. The term base, the st
 **Argue** — structured disputation, which is a different thing from dialogue:
 
 - **Debate records** with a motion, terms pinned *before* argument, sides with stated burdens, and moves that carry evidence and a warrant.
-- **An objection must restate what it attacks, in its strongest form** — enforced by validation, not requested. This is the only structural defence against strawmanning.
+- **An objection must restate what it attacks, in its strongest form** — enforced by validation, not requested. None of the platforms I looked at requires this, which is not the same as claiming none of them solves the problem another way.
 - **The tool never adjudicates.** A decision requires a named person and their reasons; the record computes which objections went unanswered and what was conceded, and it has no score. There is a test that fails if anyone ever adds one.
 - **`unresolved` is a legitimate outcome**, and often the honest one.
 - **Two people can conduct a debate with no server.** Each side writes only its own moves and exports a contribution file; the other side merges it. Editing a move, reordering them, or contradicting a copy someone already holds is *detected and refused* at merge time, and if your two sets of pinned terms differ, the record tells you that you may be arguing about different words. The limits of that guarantee — it is tamper-*evident*, not tamper-proof — are written down in [`FORMAT.md`](FORMAT.md) rather than left implied by the word "signed".
@@ -75,6 +75,44 @@ This is the opposite of the rest of the app, deliberately. The term base, the st
 - No machine reader. It cannot tell whether two texts mean the same thing, so it never tries: divergences are declared by named people, and the only automatic comparison is counting words — reported as *a question to ask a human*, never as a finding.
 - No upload path. See below.
 - No verdict. It will not tell you who won a debate, and it is built so that it cannot: a tool that scored religious argument would be the worst possible version of this.
+
+## Where this sits
+
+Naming your neighbours is the same rule this project applies to everything else, so: most of
+what is here is not new, and implying otherwise would be the exact failure this project was built
+to catch.
+
+**Not new.** Structured argument tooling has a fifty-five-year lineage — IBIS (Kunz and Rittel,
+1970), Toulmin's argument model, Araucaria, MIT's Deliberatorium. [Kialo](https://www.kialo.com) is
+the category leader in text debate and is **already** "no winner by design", so declining to
+adjudicate is not a differentiator. [Wikidebates](https://www.wikidebates.org/) is a nonprofit
+encyclopedia of pro and con arguments under CC BY-SA. Cassin's *Dictionary of Untranslatables* is
+the term-base idea done superbly across a dozen languages, in print, in 1,344 pages. IATE, UNTERM
+and TERMIUM Plus are the institutional multilingual terminology databases the parity primitive
+imitates — and they standardise translations rather than recording what each one loses. Sefaria,
+SuttaCentral, 84000 and STEPBible already publish parallel translations, each within one tradition.
+The [Database of Religious History](https://religiondatabase.org) already gathers
+expert-contributed, cited, structured claims about religion.
+
+**What I could not find anyone doing:**
+
+- Recording the *loss* as first-class, cited data **across** traditions. Institutions standardise
+the loss away; single-tradition platforms do not attempt it; the dictionary is not a tool.
+- Pinning terms across languages before an argument starts.
+- Requiring an objection to restate what it attacks, enforced by validation.
+- No accounts, no server, nothing uploaded. Every platform above is hosted.
+- A portable record that two parties can verify against each other's copy.
+
+**One warning from the field, which matters more than any competitor.** Wikidebate, the Wikimedia
+structured-debate project, was [discontinued in August 2026](https://en.wikiversity.org/wiki/Wikidebate)
+"due to a lack of moderation and policy implementation". A structurally sound, well-intentioned,
+funded debate platform died of **governance**, not of technology. That is the risk worth guarding
+against, and it is why the review path matters more than the feature list.
+
+**Adopt rather than invent.** The structure of an argument is thoroughly worked ground. The
+[Argument Interchange Format](https://en.wikipedia.org/wiki/Argument_Interchange_Format) is the
+interoperability target worth meeting so a debate recorded here can move into academic
+argumentation tooling instead of competing with it.
 
 ## The line that cannot be crossed
 
