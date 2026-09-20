@@ -27,7 +27,10 @@ import {
   aboutView, messageView,
 } from './ui.js';
 import { cardEditorView, draftsView, statementEditorView, debateEditorView, settingsView, importView } from './editor.js';
-import { blankDebate, debateSlug, lintDebate, debateToMarkdown } from './debate.js';
+import {
+  blankDebate, debateSlug, lintDebate, debateToMarkdown,
+  stampChain, restampAll, contributionFor, mergeContribution,
+} from './debate.js';
 import {
   loadDraftCards, saveDraftCard, deleteDraftCard,
   loadStatements, saveStatement, deleteStatement,
@@ -334,15 +337,19 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     }
     case 'debate': {
-      const debate = route.id ? state.debates.find((d) => d.id === route.id) : null;
-      document.title = debate ? `${debate.motion || debate.id} — Witness` : 'New debate — Witness';
+      const openDebate = route.id ? state.debates.find((d) => d.id === route.id) : null;
+      const working = openDebate || blankDebate();
+      document.title = openDebate ? `${openDebate.motion || openDebate.id} — Witness` : 'New debate — Witness';
       view.replaceChildren(debateEditorView({
-        debate: debate || blankDebate(),
+        debate: working,
         cards: state.cards,
         onSave: saveDebateDraft,
         onExport: exportEverythingFor,
         onDelete: (id) => { removeDraft(id); go('/drafts'); },
         onReset: () => go('/debate'),
+        onExportContribution: (sideId) => exportContribution(working, sideId),
+        onImportContribution: (text) => importContribution(working, text),
+        onRestamp: () => restampDebate(working),
       }).node);
       break;
     }
@@ -446,10 +453,21 @@ function saveDebateDraft(debate) {
   }
   if (!debate.id) debate.id = debateSlug(debate);
   debate.format = 'witness/debate';
+
+  // Stamp before saving. Only appends: a move that already carries a digest is
+  // verified rather than recomputed, so this cannot launder an edit.
+  const stamp = stampChain(debate);
   const result = saveDebate(debate);
   state.debates = loadDebates();
   if (!result.ok) {
     toast(result.error, { sticky: true, tone: 'error' });
+    return;
+  }
+  if (!stamp.ok) {
+    toast(
+      `Saved, but the record no longer verifies: move ${stamp.index + 1} was changed after it was stamped. Exporting a contribution will refuse until you re-stamp it, which is only legitimate if you have not sent it yet.`,
+      { sticky: true, tone: 'error' }
+    );
     return;
   }
 
@@ -466,6 +484,60 @@ function saveDebateDraft(debate) {
   } else {
     toast('Saved on this device. Nothing was uploaded.');
   }
+}
+
+/**
+ * Send only your own moves.
+ *
+ * Refuses outright when the record does not verify: a contribution is a claim
+ * about what you said, and sending one from a transcript you cannot verify would
+ * be worse than sending nothing.
+ */
+function exportContribution(debate, sideId) {
+  const stamp = stampChain(debate);
+  if (!stamp.ok) {
+    toast(`Not exported: move ${stamp.index + 1} no longer matches what it was stamped with.`, { sticky: true, tone: 'error' });
+    return;
+  }
+  const contribution = contributionFor(debate, sideId);
+  download(
+    filename('contribution', `${debate.id || 'debate'}-${sideId}`, 'json'),
+    `${JSON.stringify(contribution, null, 2)}\n`
+  );
+  toast('Contribution downloaded. It contains only your own moves, with the rest of your work left out.');
+}
+
+/** Merge what came back. Merging changes the record, so it is saved immediately. */
+function importContribution(debate, text) {
+  if (!text?.trim()) {
+    return { ok: false, messages: ['Paste a contribution file first.'], conflicts: [] };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return { ok: false, messages: [`That is not valid JSON — ${error.message}`], conflicts: [] };
+  }
+
+  const outcome = mergeContribution(debate, parsed);
+  if (outcome.ok && outcome.added.length) {
+    saveDebate(debate);
+    state.debates = loadDebates();
+  }
+  return outcome;
+}
+
+/** Deliberate, destructive, and only legitimate before an exchange. */
+function restampDebate(debate) {
+  const confirmed = globalThis.confirm?.(
+    'Re-stamp the whole transcript? This throws away every recorded digest and computes them again from the current text. It cannot tell a correction from a rewrite, so any copy the other side already holds will stop matching. Do this only if you have not sent this debate to anyone.'
+  );
+  if (!confirmed) return;
+  const result = restampAll(debate);
+  saveDebate(debate);
+  state.debates = loadDebates();
+  toast(result.ok ? 'Re-stamped from the current text.' : 'Re-stamping failed.', { tone: result.ok ? '' : 'error' });
+  render();
 }
 
 function openDraft(draft) {
@@ -522,6 +594,12 @@ function importText(text, kind) {
       return {
         ok: true,
         message: `Imported ${summary.drafts} card(s), ${summary.statements} statement(s), ${summary.debates} debate(s).`,
+      };
+    }
+    if (text.includes('witness/contribution') || kind === 'contribution') {
+      return {
+        ok: false,
+        message: 'A contribution is merged into a debate rather than imported on its own: it belongs to a specific exchange. Open that debate, then use Correspondence → Merge it.',
       };
     }
     if (kind === 'debate' || (kind === 'auto' && text.includes('"motion"') && text.includes('"moves"'))) {

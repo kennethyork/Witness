@@ -23,6 +23,8 @@ import {
 import { migrateLegacyStorage, loadDraftCards, loadSettings } from '../app/store.js';
 import {
   blankDebate, debateSlug, nextMoveId, lintDebate, debateState, debateToMarkdown,
+  moveDigest, termsDigest, transcriptDigest, verifyChain, stampChain,
+  contributionFor, mergeContribution, restampAll,
 } from '../app/debate.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -639,6 +641,200 @@ check('the debate record never claims a side won', !/\bwins\b|\bvictor/i.test(de
 check('nextMoveId increments', nextMoveId(debate) === 'm4');
 check('nextMoveId starts at m1', nextMoveId({ moves: [] }) === 'm1');
 check('debateSlug derives an id from the motion', debateSlug({ motion: 'Hesed is untranslatable!' }) === 'hesed-is-untranslatable');
+
+// ------------------------------------------------- correspondence protocol
+
+/** A debate both sides start from: same id, same pinned terms, same burdens. */
+const sharedOpening = () => ({
+  format: 'witness/debate',
+  version: 1,
+  id: 'hesed-untranslatable',
+  motion: 'Rendering hesed as loving-kindness misleads a modern reader.',
+  kind: 'disputation',
+  created: '2026-01-01',
+  terms: [{ term: 'hesed', card: 'hesed', status: 'contested', note: 'covenant loyalty vs mercy', agreed: '' }],
+  sides: [
+    { id: 'pro', name: 'A.', position: 'affirms', burden: 'show a modern reader is misled' },
+    { id: 'con', name: 'B.', position: 'denies', burden: 'show the rendering carries the sense' },
+  ],
+  moves: [],
+  concessions: [],
+  adjudication: { state: 'open', adjudicator: '', decision: '', reasons: '' },
+  note: '',
+});
+
+const move = (id, side, kind, claim, extra = {}) => ({
+  id, side, kind, claim, language: 'en', targets: [], evidence: [], ...extra,
+});
+
+// Stamping.
+const stamped = sharedOpening();
+stamped.moves = [
+  move('m1', 'pro', 'opening', 'The compound drifts toward sentiment.'),
+  move('m2', 'con', 'argument', 'Readers meet the word then read commentaries.'),
+];
+const stampResult = stampChain(stamped, { at: '2026-01-02T00:00:00.000Z' });
+check('stamping assigns a link and a digest to every move', stampResult.ok && stampResult.stamped === 2);
+check('a stamped transcript verifies', verifyChain(stamped).state === 'intact');
+check('each move records when it was made', stamped.moves[0].at === '2026-01-02T00:00:00.000Z');
+check('the second move links to the first', stamped.moves[1].prev !== stamped.moves[0].prev);
+
+// Tamper detection. This is the whole point of the chain.
+const edited = structuredClone(stamped);
+edited.moves[0].claim = 'The compound is fine actually.';
+const editedCheck = verifyChain(edited);
+check('editing a move is detected', editedCheck.state === 'broken');
+check('the break is reported at the earliest edited move', editedCheck.index === 0);
+check('the break names the reason as the contents', editedCheck.reason === 'content');
+
+const editedLater = structuredClone(stamped);
+editedLater.moves[1].claim = 'Something else entirely.';
+check('editing the last move is detected too', verifyChain(editedLater).index === 1);
+
+const reorderedMoves = structuredClone(stamped);
+reorderedMoves.moves = [reorderedMoves.moves[1], reorderedMoves.moves[0]];
+check('reordering moves is detected as a broken link', verifyChain(reorderedMoves).reason === 'link');
+
+// A forward chain catches edits, reordering, and removal from the middle. It
+// cannot catch that trailing moves were dropped, because a shorter chain still
+// verifies. Worth stating as a limit rather than discovering it in the field:
+// it is exactly why both sides keep a copy and compare transcript digests.
+const threeMoves = sharedOpening();
+threeMoves.moves = [
+  move('m1', 'pro', 'opening', 'One.'),
+  move('m2', 'con', 'argument', 'Two.'),
+  move('m3', 'pro', 'response', 'Three.', { targets: ['m2'] }),
+];
+stampChain(threeMoves, { at: '2026-01-02T00:00:00.000Z' });
+
+const cutMiddle = structuredClone(threeMoves);
+cutMiddle.moves.splice(1, 1);
+check('removing a move from the middle is detected', verifyChain(cutMiddle).state === 'broken');
+
+const cutTail = structuredClone(threeMoves);
+cutTail.moves.pop();
+check('dropping trailing moves still verifies — a forward chain cannot see truncation', verifyChain(cutTail).state === 'intact');
+check(
+  'which is why the transcript digest is compared, not merely verified',
+  transcriptDigest(cutTail.moves) !== transcriptDigest(threeMoves.moves)
+);
+
+check('an unstamped record is reported as unsigned, not broken', verifyChain(debate).state === 'unsigned');
+
+const halfStamped = structuredClone(stamped);
+stampChain(halfStamped);
+halfStamped.moves.push(move('m3', 'pro', 'closing', 'Nothing further.'));
+check('a half-stamped record is reported as partial', verifyChain(halfStamped).state === 'partial');
+
+// Stamping must not launder an edit.
+const laundering = structuredClone(stamped);
+laundering.moves[0].claim = 'Rewritten.';
+check('stamping refuses to re-stamp an edited move', stampChain(laundering).ok === false);
+check('and it names the move', stampChain(laundering).index === 0);
+
+// Digests.
+check('a move digest changes when the move changes', moveDigest(stamped.moves[0]) !== moveDigest({ ...stamped.moves[0], claim: 'x' }));
+check('a move digest is independent of key order', moveDigest(stamped.moves[0]) === moveDigest(Object.fromEntries(Object.entries(stamped.moves[0]).reverse())));
+check('the transcript digest changes with any move', transcriptDigest(stamped.moves) !== transcriptDigest(edited.moves));
+check('the transcript digest changes when moves are dropped', transcriptDigest(stamped.moves) !== transcriptDigest([stamped.moves[0]]));
+check('the transcript digest is stable', transcriptDigest(stamped.moves) === transcriptDigest(stamped.moves));
+check('the empty transcript has its own digest', transcriptDigest([]) !== transcriptDigest(stamped.moves));
+check('terms digests agree on identical terms', termsDigest(stamped.terms) === termsDigest(sharedOpening().terms));
+check(
+  'terms digests differ when a term is reworded',
+  termsDigest(stamped.terms) !== termsDigest([{ term: 'hesed', card: 'hesed', status: 'contested', note: 'something else' }])
+);
+
+// The exchange itself: A sends, B merges, B replies, A merges.
+const sideA = sharedOpening();
+sideA.moves = [move('m1', 'pro', 'opening', 'The compound drifts toward sentiment.')];
+stampChain(sideA, { at: '2026-01-02T00:00:00.000Z' });
+
+const contributionA = contributionFor(sideA, 'pro', { at: '2026-01-02T00:00:00.000Z' });
+check('a contribution carries only its own side\u2019s moves', contributionA.moves.length === 1 && contributionA.moves[0].side === 'pro');
+check('a contribution records what it was written against', contributionA.basedOn === transcriptDigest(sideA.moves));
+check('a contribution carries the pinned terms', contributionA.format === 'witness/contribution');
+
+const sideB = sharedOpening();
+const mergeA = mergeContribution(sideB, contributionA);
+check('B merges A\u2019s contribution', mergeA.ok && mergeA.added[0] === 'm1');
+check('B now holds A\u2019s move intact', verifyChain(sideB).state === 'intact');
+check('merging the same contribution again adds nothing', mergeContribution(sideB, contributionA).added.length === 0);
+
+// B replies, then A merges the reply.
+sideB.moves.push(move('m2', 'con', 'objection', 'Commentary reaches few readers.', {
+  targets: ['m1'],
+  steelman: 'The objection grants that the compound is the best single phrase available in English.',
+}));
+stampChain(sideB, { at: '2026-01-03T00:00:00.000Z' });
+const contributionB = contributionFor(sideB, 'con');
+const mergeB = mergeContribution(sideA, contributionB);
+check('A merges B\u2019s reply, chained onto A\u2019s own move', mergeB.ok && mergeB.added[0] === 'm2');
+check('the full exchange verifies end to end', verifyChain(sideA).state === 'intact');
+check('both sides end up holding the same transcript', transcriptDigest(sideA.moves) === transcriptDigest(sideB.moves));
+check('the merged debate still passes lint', debateErrors(sideA).length === 0, JSON.stringify(debateErrors(sideA)));
+
+// Refusals. A merge that quietly reorganises somebody's argument is worse than one that fails.
+const tampered = structuredClone(contributionA);
+tampered.moves[0].claim = 'A said something they did not say.';
+const tamperedResult = mergeContribution(sharedOpening(), tampered);
+check('a contribution whose move was edited is rejected', !tamperedResult.ok && tamperedResult.conflicts.length === 1);
+check('the rejection explains that it was altered after stamping', tamperedResult.conflicts[0].reason.includes('altered'));
+
+const contradictory = structuredClone(contributionA);
+contradictory.moves[0].claim = 'Different claim, same id.';
+const contradictionResult = mergeContribution(sideA, contradictory);
+check('a move contradicting one already held is rejected', !contradictionResult.ok);
+check('and the conflict names the move', contradictionResult.conflicts[0].id === 'm1');
+
+// A holds one of its own moves that B has never seen, so B's reply cannot chain
+// onto it. Note the fixture is built from A's move as A actually sent it, not
+// from a clone of A's current state: mergeContribution mutates the debate it
+// merges into, so cloning that would silently include B's reply already.
+const ahead = sharedOpening();
+ahead.moves = [structuredClone(contributionA.moves[0]), move('m9', 'pro', 'argument', 'A move A never sent.')];
+stampChain(ahead);
+const joinsBadly = mergeContribution(ahead, contributionB);
+check('a contribution written against an unseen transcript is refused', !joinsBadly.ok);
+check('and the refusal explains the divergence', joinsBadly.messages.some((m) => m.includes('has not seen')));
+
+check('a file that is not a contribution is refused', !mergeContribution(sharedOpening(), { format: 'nope' }).ok);
+check('a contribution for another debate is refused', !mergeContribution({ ...sharedOpening(), id: 'other' }, contributionA).ok);
+
+// Terms divergence is the check worth having: you may not be arguing about the same words.
+const drifted = sharedOpening();
+drifted.terms = [{ term: 'hesed', card: 'hesed', status: 'settled', agreed: 'mercy, simply' }];
+const driftResult = mergeContribution(drifted, contributionA);
+check('differing pinned terms are surfaced, not merged', driftResult.termsDiverged === true);
+check('the merge still completes so the exchange is not blocked', driftResult.ok);
+check('and it says to check the words before arguing further', driftResult.messages.some((m) => m.includes('same words')));
+check('the incoming terms are handed back for inspection', driftResult.incomingTerms.length === 1);
+
+// The deliberate escape hatch, for correcting your own unexchanged words.
+const brokenThenFixed = structuredClone(stamped);
+brokenThenFixed.moves[0].claim = 'Corrected before sending.';
+check('a corrected move leaves the record unverifiable', verifyChain(brokenThenFixed).state === 'broken');
+restampAll(brokenThenFixed, { at: '2026-01-04T00:00:00.000Z' });
+check('re-stamping is the deliberate way out', verifyChain(brokenThenFixed).state === 'intact');
+check(
+  'and it moves the transcript revision, so a copy held by the other side stops matching',
+  transcriptDigest(brokenThenFixed.moves) !== transcriptDigest(stamped.moves)
+);
+check('re-stamping is never automatic', verifyChain(structuredClone(stamped)).state === 'intact');
+
+// Two rules about who may say what.
+check(
+  'a side cannot answer its own move',
+  debateErrors({
+    ...debate,
+    moves: [debate.moves[0], { ...debate.moves[2], targets: ['m1'] }],
+  }).some((f) => f.message.includes('cannot answer its own move'))
+);
+check(
+  'the same side speaking twice in a row is warned about',
+  debateWarnings({ ...debate, moves: [debate.moves[0], { ...debate.moves[1], side: 'pro' }, debate.moves[2]] })
+    .some((f) => f.message.includes('previous move'))
+);
 
 // ------------------------------------------------------------------ report
 

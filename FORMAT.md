@@ -112,6 +112,64 @@ terminology it is often the more honest answer than a decision.
 
 ---
 
+## The correspondence protocol
+
+Two people can conduct a debate without any server, the way a disputation by
+post always worked. Each side writes only its own moves, exports a
+**contribution** file, and sends it. Importing merges the correspondent's moves
+and verifies that nothing already held has been altered.
+
+```
+contribution
+  debate      { id, motion }
+  side        which side sent it
+  basedOn     transcript digest this was written against
+  terms       the pinned terms, as this side holds them
+  termsDigest sha256 of those terms
+  moves[]     only this side's moves
+```
+
+Each move carries `at` (when it was made), `prev` (the transcript digest it was
+appended to) and `digest` (sha256 of its own contents, including `prev`).
+`stampChain` assigns these and only ever **appends**: an already-stamped move is
+verified rather than recomputed, so it cannot be used to launder an edit.
+
+**A merge refuses rather than guesses.** It will not accept a move that
+contradicts one you already hold, a move whose digest does not match its own
+contents, or a move written against a transcript version you do not have — and in
+each case it names the move and the reason. A merge that silently reorganises
+somebody's argument is worse than a merge that fails.
+
+**Terms divergence is reported.** If the correspondent's `termsDigest` differs
+from yours, the moves still merge and the record says so loudly, because the two
+of you may be arguing about different words. Reading the two digests aloud to
+each other is the point of having them.
+
+### What this proves, and what it does not
+
+Stated plainly rather than implied by the word "signed":
+
+| holds | does not hold |
+|---|---|
+| Editing any move is detected, at the earliest edited move | Someone holding a copy can edit a move and recompute every digest after it; nothing here would notice |
+| Reordering moves is detected | Dropping **trailing** moves is not: a shorter chain still verifies |
+| An incoming contribution contradicting your copy is refused | Nothing prevents a side from writing an entirely fabricated transcript |
+
+The practical guarantee is structural and social rather than cryptographic: each
+side holds its own copy, your own record of what you said lives in your file, and
+a contradiction surfaces at merge time rather than never. Real asymmetric
+signatures would close the fabrication gap, and they are the upgrade path — they
+need a secure context and a key-management story that a static folder does not
+have.
+
+`Re-stamp everything` exists for one case: you wrote a move, saved it, spotted a
+typo, and have not sent it. It recomputes the whole chain and therefore cannot
+tell a correction from a rewrite, so it is never automatic, it says so in the
+confirmation, and it moves the transcript revision so that any copy the other
+side already holds stops matching.
+
+---
+
 ## The line that cannot be crossed
 
 **The repository is public. Case data is not.**

@@ -10,7 +10,7 @@
  * and the tests use, so the editor cannot disagree with CI about what is valid.
  */
 
-import { el, block, langName, clear } from './dom.js';
+import { el, block, langName, clear, definitionList } from './dom.js';
 import {
   field, textInput, textArea, select, checkbox, repeatable, findingsPanel,
   progressBar, getPath, setPath, hint,
@@ -25,6 +25,7 @@ import {
   MOVE_KINDS, MOVE_KIND_LABELS, SIDE_POSITIONS, TERM_STATES, TERM_STATE_LABELS,
   CONCESSION_STATES, CONCESSION_LABELS, ADJUDICATION_STATES, DEBATE_KINDS,
   debateState, debateSlug, nextMoveId, lintDebate,
+  verifyChain, termsDigest,
 } from './debate.js';
 import { STATUS_LABELS } from './search.js';
 import { button, sectionHeading, stat } from './ui.js';
@@ -976,7 +977,10 @@ function parityPanel(statement, cards) {
  * declared and computes facts about the record. It has no opinion on who argued
  * better, and there is nowhere in this view to express one.
  */
-export function debateEditorView({ debate, cards, onSave, onExport, onDelete, onReset }) {
+export function debateEditorView({
+  debate, cards, onSave, onExport, onDelete, onReset,
+  onExportContribution, onImportContribution, onRestamp,
+}) {
   const findingsNode = el('div', { class: 'editor-findings' });
   const stateNode = el('div', { class: 'debate-panel' });
   let timer = null;
@@ -1152,10 +1156,17 @@ export function debateEditorView({ debate, cards, onSave, onExport, onDelete, on
             }))
           : el('p', { class: 'empty', text: 'No other moves to answer yet.' });
 
+        const author = (debate.sides || []).find((side) => side.id === move.side);
+
         return el('div', { class: 'repeatable-item version' },
           el('div', { class: 'repeatable-head' },
             el('span', { class: 'repeatable-title', text: `Move ${index + 1} — ${move.id}` }),
             button('Remove', remove, { class: 'ghost tiny' })
+          ),
+          el('p', { class: 'move-meta' },
+            el('span', { auto: author?.name || move.side || 'unattributed' }),
+            move.at ? ` · ${String(move.at).slice(0, 16).replace('T', ' ')}` : ' · not stamped',
+            move.digest ? ` · ${move.digest.slice(0, 12)}` : ''
           ),
           el('div', { class: 'form-row' },
             field('Kind', select({
@@ -1298,11 +1309,103 @@ export function debateEditorView({ debate, cards, onSave, onExport, onDelete, on
     );
   };
 
+  // ------------------------------------------------------- correspondence
+
+  const correspondenceNode = el('div', { class: 'correspondence' });
+  let mySideId = debate.sides?.[0]?.id || '';
+
+  const chainLine = () => {
+    const chain = verifyChain(debate);
+    if (chain.state === 'empty') return el('p', { class: 'hint', text: 'No moves yet, so nothing is stamped.' });
+    if (chain.state === 'unsigned') {
+      return el('p', { class: 'hint', text: `${chain.count} move(s), none stamped yet. They will be stamped when you save.` });
+    }
+    if (chain.state === 'partial') {
+      return el('p', { class: 'hint', text: `Move ${chain.index + 1} is not stamped yet. Save to stamp it.` });
+    }
+    if (chain.state === 'broken') {
+      return el('div', { class: 'message message-error' },
+        el('p', {},
+          chain.reason === 'content'
+            ? `Move ${chain.index + 1} does not match what it was stamped with. It has been edited since.`
+            : `The chain breaks at move ${chain.index + 1}: it links to a transcript you do not hold.`
+        ),
+        el('p', { class: 'hint', text: 'Exporting a contribution will refuse while this is true, because the other side could not tell your correction from a rewrite.' })
+      );
+    }
+    return el('p', { class: 'clean', text: `Chain intact across ${chain.count} move(s).` });
+  };
+
+  const renderCorrespondence = () => {
+    const sides = debate.sides || [];
+    if (!sides.some((side) => side.id === mySideId)) mySideId = sides[0]?.id || '';
+    const chain = verifyChain(debate);
+    const resultNode = el('div', { class: 'import-result' });
+    const input = el('textarea', {
+      id: 'contribution-input', rows: 5, spellcheck: 'false',
+      placeholder: 'Paste the contribution file your correspondent sent you.',
+    });
+
+    clear(correspondenceNode).append(
+      el('p', {
+        class: 'hint',
+        text: 'No server, so the exchange is by file. You write only your own moves and send them; the other side merges them and sends theirs back. Neither of you can alter the other\u2019s words without the digests failing.',
+      }),
+      field('Which side are you?', select({
+        id: 'correspondence-side',
+        value: mySideId,
+        options: sides.map((side) => [side.id, side.name || side.id]),
+        onChange: (value) => { mySideId = value; renderCorrespondence(); },
+      }), { id: 'correspondence-side', hint: 'Only this side\u2019s moves are exported. Your drafts and other debates never leave.' }),
+
+      chainLine(),
+
+      definitionList([
+        ['Transcript revision', chain.digest ? chain.digest.slice(0, 16) : 'not stamped yet'],
+        ['Pinned terms', termsDigest(debate.terms).slice(0, 16)],
+      ]),
+      el('p', { class: 'hint', text: 'Both sides can read those two lines aloud to each other. If the terms digest differs, you are not arguing about the same words.' }),
+
+      el('div', { class: 'actions' },
+        button('Export my moves to send', () => onExportContribution(mySideId), { class: 'ghost' }),
+        chain.state === 'broken'
+          ? button('Re-stamp everything', () => onRestamp(), { class: 'ghost danger' })
+          : null
+      ),
+
+      field('Import a contribution', input, {
+        id: 'contribution-input',
+        hint: 'Nothing is merged if a move contradicts one you already hold, if a digest does not match, or if it was written against a transcript you do not have.',
+      }),
+      el('div', { class: 'actions' },
+        button('Merge it', () => {
+          const outcome = onImportContribution(input.value);
+          resultNode.replaceChildren(
+            ...(outcome?.messages || []).map((message) =>
+              el('p', { class: outcome?.ok ? 'clean' : 'field-error', text: message })
+            ),
+            ...(outcome?.conflicts || []).map((conflict) =>
+              el('p', { class: 'field-error', text: `${conflict.id}: ${conflict.reason}` })
+            )
+          );
+          if (outcome?.ok && outcome.added?.length) {
+            input.value = '';
+            renderMoves();
+            renderCorrespondence();
+            refresh();
+          }
+        })
+      ),
+      resultNode
+    );
+  };
+
   renderTerms();
   renderSides();
   renderMoves();
   renderConcessions();
   renderAdjudication();
+  renderCorrespondence();
 
   const node = el('article', { class: 'editor debate-editor' },
     datalists(),
@@ -1352,6 +1455,11 @@ export function debateEditorView({ debate, cards, onSave, onExport, onDelete, on
     el('fieldset', { class: 'group' },
       el('legend', { text: 'Where each move stands' }),
       concessionsNode
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Correspondence' }),
+      correspondenceNode
     ),
 
     el('fieldset', { class: 'group' },

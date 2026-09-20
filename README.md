@@ -52,6 +52,7 @@ The domain has a mature precedent for primitives 2 and 3: multilingual legal dra
 - **An objection must restate what it attacks, in its strongest form** — enforced by validation, not requested. This is the only structural defence against strawmanning.
 - **The tool never adjudicates.** A decision requires a named person and their reasons; the record computes which objections went unanswered and what was conceded, and it has no score. There is a test that fails if anyone ever adds one.
 - **`unresolved` is a legitimate outcome**, and often the honest one.
+- **Two people can conduct a debate with no server.** Each side writes only its own moves and exports a contribution file; the other side merges it. Editing a move, reordering them, or contradicting a copy someone already holds is *detected and refused* at merge time, and if your two sets of pinned terms differ, the record tells you that you may be arguing about different words. The limits of that guarantee — it is tamper-*evident*, not tamper-proof — are written down in [`FORMAT.md`](FORMAT.md) rather than left implied by the word "signed".
 
 **Deliberately absent**, and not by omission:
 

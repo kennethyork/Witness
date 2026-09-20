@@ -1,5 +1,29 @@
 /**
- * Debate records: structured adversarial disputation.
+ * Debate records: structured adversarial disputation, and the correspondence
+ * protocol that lets two people conduct one without a server.
+ *
+ * The exchange works the way a disputation by post always worked: each side
+ * writes only its own moves, exports them as a contribution file, and sends it.
+ * Importing merges the other side's moves and verifies that nothing already in
+ * your copy has been altered. That last part is the whole point: the record of
+ * what you said lives in your copy of the file, so nobody can edit your words
+ * and have it hold.
+ *
+ * On what this does and does not prove, stated plainly rather than implied by
+ * the word "signed":
+ *
+ *  - Each move carries a digest, and each move's digest is chained to the digest
+ *    of every move before it. Editing any move breaks every link after it, and
+ *    the break is reported at the earliest edited move.
+ *  - That makes tampering *evident*. It does not make it *impossible*: someone
+ *    holding a record can edit a move and recompute the whole chain, and this
+ *    code cannot tell the difference. Real asymmetric signatures would close
+ *    that, and they are the documented upgrade path, but they need a secure
+ *    context and a key management story that a static folder does not have.
+ *  - So the practical guarantee is social and structural rather than
+ *    cryptographic: both sides hold their own copy, an incoming contribution
+ *    that contradicts what you already hold is *rejected* with the conflicting
+ *    moves named, and you can always compare digests out loud.
  *
  * The statement record is for a text that parties agree on. A debate is the
  * opposite situation: two or more sides, a question in dispute, and an outcome
@@ -35,6 +59,8 @@
  *
  * DOM-free and dependency-free, so scripts/check.mjs can test all of it.
  */
+
+import { sha256Hex, canonical } from './hash.js';
 
 export const MOVE_KINDS = ['opening', 'argument', 'objection', 'response', 'closing'];
 
@@ -310,6 +336,22 @@ export function lintDebate(debate) {
     }
   }
 
+  // You cannot answer yourself, and a debate where one side speaks twice in a row
+  // is two speeches rather than an exchange. Flagged rather than blocked: a
+  // closing statement legitimately follows your own previous move.
+  const order = debate?.moves || [];
+  order.forEach((move, index) => {
+    for (const target of move?.targets || []) {
+      const targetMove = order.find((other) => other.id === target);
+      if (targetMove && targetMove.side === move.side) {
+        at(`moves[${index}].targets`, 'a side cannot answer its own move. If this develops your own argument, make it an argument rather than an objection.');
+      }
+    }
+    if (index > 0 && order[index - 1].side === move.side) {
+      at(`moves[${index}].side`, 'the same side had the previous move. Check the order, unless this is a deliberate continuation.', 'warn');
+    }
+  });
+
   for (const [index, concession] of (debate?.concessions || []).entries()) {
     const where = `concessions[${index}]`;
     if (!sideIds.has(concession?.side)) at(`${where}.side`, `unknown side "${concession?.side}"`);
@@ -494,4 +536,277 @@ export function debateToMarkdown(debate) {
 
 function cell(value) {
   return String(value ?? '').replace(/\|/g, '\\|').replace(/\n+/g, ' ');
+}
+
+// ------------------------------------------------- the correspondence protocol
+
+/**
+ * The digest of an empty transcript. Everything chains from here.
+ *
+ * A hash chain makes tampering evident, not impossible. Anyone holding a copy
+ * can edit a move and recompute every digest after it, and nothing here would
+ * notice. What it catches is the ordinary case: one side quietly altering what
+ * the other side said, or what they themselves said earlier, in a copy they
+ * then send on. See the note at the top of this file for the honest limits.
+ */
+const GENESIS = sha256Hex('witness/debate/genesis');
+
+/**
+ * The fields a move is judged on. Everything a person could have written, plus
+ * the link backwards. Deliberately excludes `digest`, which is derived from this.
+ */
+const MOVE_DIGEST_FIELDS = [
+  'id', 'side', 'kind', 'language', 'claim', 'warrant', 'steelman',
+  'impact', 'targets', 'evidence', 'at', 'prev',
+];
+
+function movePayload(move) {
+  const payload = {};
+  for (const key of MOVE_DIGEST_FIELDS) {
+    if (move?.[key] !== undefined) payload[key] = move[key];
+  }
+  return payload;
+}
+
+/** The digest of one move's contents, including the link to what came before. */
+export function moveDigest(move) {
+  return sha256Hex(canonical(movePayload(move)));
+}
+
+/**
+ * The digest of the pinned terms.
+ *
+ * Two people can compare this by reading it aloud, and the comparison is worth
+ * making: if it differs, the sides are not arguing from the same pinned words,
+ * whatever else they agree about.
+ */
+export function termsDigest(terms) {
+  return sha256Hex(
+    canonical(
+      (terms || []).map((term) => ({
+        term: term?.term || '',
+        card: term?.card || '',
+        status: term?.status || '',
+        agreed: term?.agreed || '',
+        note: term?.note || '',
+      }))
+    )
+  );
+}
+
+/** The digest of a whole transcript: the fold of every move's digest. */
+export function transcriptDigest(moves) {
+  let accumulator = GENESIS;
+  for (const move of moves || []) {
+    accumulator = sha256Hex(`${accumulator}:${moveDigest(move)}`);
+  }
+  return accumulator;
+}
+
+/**
+ * Check a transcript without changing it.
+ *
+ * Reports where it first breaks rather than only that it broke, because "one of
+ * the moves has been edited" is not actionable and "move 3 does not match what
+ * it was stamped with" is.
+ */
+export function verifyChain(debate) {
+  const moves = debate?.moves || [];
+  if (!moves.length) return { state: 'empty', count: 0 };
+
+  const stamped = moves.filter((move) => move?.digest).length;
+  if (!stamped) return { state: 'unsigned', count: moves.length };
+  if (stamped !== moves.length) {
+    const index = moves.findIndex((move) => !move?.digest);
+    return { state: 'partial', count: moves.length, index };
+  }
+
+  let accumulator = GENESIS;
+  for (const [index, move] of moves.entries()) {
+    if (move.prev !== accumulator) {
+      return { state: 'broken', reason: 'link', index, expected: accumulator, found: move.prev };
+    }
+    const digest = moveDigest(move);
+    if (digest !== move.digest) {
+      return { state: 'broken', reason: 'content', index, expected: digest, found: move.digest };
+    }
+    accumulator = sha256Hex(`${accumulator}:${digest}`);
+  }
+
+  return { state: 'intact', count: moves.length, digest: accumulator };
+}
+
+/**
+ * Give every unstamped move a link and a digest.
+ *
+ * Only appends. A move that is already stamped is verified rather than
+ * recomputed, so this can never be used to launder an edit: if the history does
+ * not check out, it refuses and says where.
+ */
+export function stampChain(debate, { at = new Date().toISOString() } = {}) {
+  const moves = (debate.moves = debate.moves || []);
+  let accumulator = GENESIS;
+  let stamped = 0;
+
+  for (const [index, move] of moves.entries()) {
+    if (move.digest) {
+      if (move.prev !== accumulator) return { ok: false, reason: 'link', index };
+      const digest = moveDigest(move);
+      if (digest !== move.digest) return { ok: false, reason: 'content', index };
+      accumulator = sha256Hex(`${accumulator}:${digest}`);
+      continue;
+    }
+    move.prev = accumulator;
+    if (!move.at) move.at = at;
+    move.digest = moveDigest(move);
+    accumulator = sha256Hex(`${accumulator}:${move.digest}`);
+    stamped += 1;
+  }
+
+  return { ok: true, stamped, digest: accumulator };
+}
+
+/**
+ * Throw away every stamp and chain the transcript again.
+ *
+ * Deliberately not called automatically, and deliberately named for what it is.
+ * There is a legitimate use: you wrote a move, saved it, spotted a typo, and
+ * have not sent it to anyone. Restamping recomputes the whole history from
+ * scratch, so it cannot tell an honest correction from a rewritten record. Any
+ * copy your correspondent already holds will stop matching, which is the
+ * signal you were supposed to get.
+ */
+export function restampAll(debate, { at } = {}) {
+  for (const move of debate.moves || []) {
+    delete move.digest;
+    delete move.prev;
+  }
+  return stampChain(debate, at ? { at } : {});
+}
+
+/**
+ * One side's contribution, ready to send.
+ *
+ * Contains only that side's moves. Your correspondent cannot see your drafting
+ * notes or your other debates, and cannot alter these words without their
+ * digests failing when you compare against your own copy.
+ */
+export function contributionFor(debate, sideId, { author = '', at = new Date().toISOString() } = {}) {
+  const side = (debate.sides || []).find((entry) => entry.id === sideId);
+  return {
+    format: 'witness/contribution',
+    version: 1,
+    debate: { id: debate.id || '', motion: debate.motion || '' },
+    side: sideId,
+    author: author || side?.name || sideId,
+    at,
+    basedOn: transcriptDigest(debate.moves),
+    terms: debate.terms || [],
+    termsDigest: termsDigest(debate.terms),
+    moves: (debate.moves || []).filter((move) => move.side === sideId),
+  };
+}
+
+/**
+ * Merge a correspondent's contribution.
+ *
+ * Refuses rather than guesses. Three things it will not do: accept a move that
+ * contradicts one you already hold, accept a move whose digest does not match
+ * its contents, or stitch on a move that was written against a version of the
+ * transcript you do not have. In each case it says which move and why, because
+ * a merge that silently reorganises somebody's argument is worse than a merge
+ * that fails.
+ */
+export function mergeContribution(debate, contribution) {
+  const result = {
+    ok: false,
+    added: [],
+    conflicts: [],
+    termsDiverged: false,
+    incomingTerms: [],
+    chain: null,
+    messages: [],
+  };
+
+  if (!contribution || typeof contribution !== 'object' || contribution.format !== 'witness/contribution') {
+    result.messages.push('That is not a Witness contribution file.');
+    return result;
+  }
+  if (!Array.isArray(contribution.moves)) {
+    result.messages.push('The contribution has no moves in it.');
+    return result;
+  }
+  if (contribution.debate?.id && debate.id && contribution.debate.id !== debate.id) {
+    result.messages.push(
+      `That contribution belongs to a different debate (“${contribution.debate.motion || contribution.debate.id}”).`
+    );
+    return result;
+  }
+
+  const mine = new Map((debate.moves || []).map((move) => [move.id, move]));
+
+  // Every incoming move must be internally consistent, and must not contradict
+  // anything already held. This is the check that makes the exchange worth
+  // doing at all.
+  for (const move of contribution.moves) {
+    if (!move?.id) {
+      result.conflicts.push({ id: '(no id)', reason: 'a move with no id cannot be merged' });
+      continue;
+    }
+    if (mine.has(move.id)) {
+      if (moveDigest(mine.get(move.id)) !== moveDigest(move)) {
+        result.conflicts.push({
+          id: move.id,
+          reason: 'you already hold this move with different contents. One of the two has been edited.',
+        });
+      }
+      continue;
+    }
+    if (move.digest && moveDigest(move) !== move.digest) {
+      result.conflicts.push({
+        id: move.id,
+        reason: 'its digest does not match its contents, so it was altered after it was stamped',
+      });
+    }
+  }
+
+  if (result.conflicts.length) {
+    result.messages.push('Nothing was merged.');
+    return result;
+  }
+
+  const incoming = contribution.moves.filter((move) => !mine.has(move.id));
+  if (!incoming.length) {
+    result.ok = true;
+    result.messages.push('Nothing new: you already hold every move in this contribution.');
+    return result;
+  }
+
+  result.termsDiverged = contribution.termsDigest !== termsDigest(debate.terms);
+  result.incomingTerms = contribution.terms || [];
+
+  const combined = [...(debate.moves || []), ...incoming];
+  const verification = verifyChain({ moves: combined });
+  result.chain = verification;
+
+  if (verification.state === 'broken') {
+    const where = incoming.findIndex((move) => move.id === combined[verification.index]?.id);
+    result.messages.push(
+      where === -1
+        ? 'The merged transcript would not verify, so nothing was merged.'
+        : `The chain does not join at “${combined[verification.index].id}”. It was written against a transcript ending ${String(verification.found).slice(0, 12)}, but the transcript you hold ends ${String(verification.expected).slice(0, 12)}. One of you has moves the other has not seen.`
+    );
+    return result;
+  }
+
+  debate.moves = combined;
+  result.ok = true;
+  result.added = incoming.map((move) => move.id);
+  result.messages.push(`Merged ${incoming.length} move(s) from ${contribution.author || contribution.side}.`);
+  if (result.termsDiverged) {
+    result.messages.push(
+      'Their pinned terms differ from yours. The terms were not merged: before arguing further, check that you are both arguing about the same words.'
+    );
+  }
+  return result;
 }
