@@ -6,7 +6,7 @@ A cited term base for interfaith translation, plus a parity tracker for multi-la
 
 Live site: <https://witness.studytools.cc/> — static, no server, no accounts, no dependencies.
 
-Repository: <https://github.com/kennethyork/Witness->, which also serves the site at <https://kennethyork.github.io/Witness-/> (that URL redirects to the domain above).
+Repository: <https://github.com/kennethyork/Witness>, which also serves the site at <https://kennethyork.github.io/Witness/> (that URL redirects to the domain above).
 
 ---
 
@@ -89,7 +89,7 @@ Browsers refuse to load ES modules over `file://`, so opening `index.html` from 
 3. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 4. [`.github/workflows/pages.yml`](.github/workflows/pages.yml) validates the cards against the schema, runs both test suites, builds `_site/`, and deploys it.
 
-No base-path configuration is needed. Every asset is referenced relatively and the app fetches its data relative to its own module URL, so it runs at `/`, at `/Witness-/`, on a user page, or on a custom domain — where it is served from the domain root — without changes.
+No base-path configuration is needed. Every asset is referenced relatively and the app fetches its data relative to its own module URL, so it runs at `/`, at `/Witness/`, on a user page, or on a custom domain — where it is served from the domain root — without changes.
 
 To serve it on a subdomain, claim the domain in the repository settings **before** pointing DNS at it (GitHub's own warning: a domain configured in DNS but unclaimed can be taken over by another repository). Then add one record:
 
