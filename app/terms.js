@@ -7,6 +7,25 @@
 
 const BUNDLE_URL = new URL('../data/terms.json', import.meta.url);
 
+/**
+ * The published debates, read the way the term base is.
+ *
+ * Published debates are files in the repository, and that is what makes this a
+ * platform without a server: the repository already supplies identity,
+ * publishing, attribution, history and moderation-by-merge. This supplies the
+ * record; git supplies the rest.
+ */
+export async function loadPublishedDebates(url = new URL('../data/debates.json', import.meta.url)) {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) {
+    // A missing set of published debates is not a failure: the app works with
+    // none, and the home screen simply has nothing published to show.
+    return { digest: null, count: 0, debates: [] };
+  }
+  const bundle = await response.json();
+  return Array.isArray(bundle?.debates) ? bundle : { digest: null, count: 0, debates: [] };
+}
+
 export async function loadTermBase(url = BUNDLE_URL) {
   if (globalThis.location?.protocol === 'file:') {
     throw new Error(

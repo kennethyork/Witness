@@ -542,6 +542,10 @@ export function debateToMarkdown(debate) {
 
   if ((debate.note || '').trim()) lines.push('## Note', '', debate.note, '');
 
+  if ((debate.provenance_note || '').trim()) {
+    lines.push('## How this debate came to exist', '', debate.provenance_note, '');
+  }
+
   lines.push(
     '---',
     '',
@@ -683,6 +687,19 @@ export function stampChain(debate, { at = new Date().toISOString() } = {}) {
   }
 
   return { ok: true, stamped, digest: accumulator };
+}
+
+/**
+ * The digest of a published set of debates.
+ *
+ * A reader should be able to name which revision of a published set they read,
+ * the same way a card citation names a card revision rather than just an id.
+ */
+export function debateBaseDigest(debates) {
+  const ordered = [...(debates || [])].sort((left, right) => String(left?.id).localeCompare(String(right?.id)));
+  return sha256Hex(
+    ordered.map((debate) => `${debate?.id}:${transcriptDigest(debate?.moves)}`).join('\n')
+  );
 }
 
 /**

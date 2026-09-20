@@ -18,6 +18,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { baseDigest } from '../app/hash.js';
+import { stampChain, debateBaseDigest } from '../app/debate.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -82,7 +83,16 @@ class FakeElement extends FakeNode {
   }
 
   get textContent() {
-    if (this.children.length) return this.children.map((child) => child.textContent ?? '').join('');
+    if (this.children.length) {
+      // Hidden subtrees are excluded. The search panel stays mounted and hidden
+      // on every non-terms route, and counting its text meant an assertion like
+      // "renders Search the term base" could pass while the view itself was
+      // empty -- a check passing for the wrong reason is worse than failing.
+      return this.children
+        .filter((child) => child.hidden !== true)
+        .map((child) => child.textContent ?? '')
+        .join('');
+    }
     return this._text;
   }
 
@@ -274,11 +284,35 @@ const termBase = {
   count: cards.length,
   cards,
 };
-globalThis.fetch = async () => ({
+// The published debates, assembled the way the build assembles them, so the
+// thread view is exercised against a realistic record rather than an empty one.
+const publishedDebates = [];
+try {
+  const files = (await readdir(path.join(root, 'debates'))).filter((name) => name.endsWith('.json')).sort();
+  for (const file of files) {
+    const debate = JSON.parse(await readFile(path.join(root, 'debates', file), 'utf8'));
+    stampChain(debate);
+    publishedDebates.push(debate);
+  }
+} catch {
+  // No published debates is a valid state.
+}
+const debateBase = {
+  format: 'witness/debate-base',
+  version: 1,
+  license: 'CC-BY-SA-4.0',
+  digest: debateBaseDigest(publishedDebates),
+  count: publishedDebates.length,
+  debates: publishedDebates,
+};
+
+// One stub, routed by URL. An earlier version returned the term base for every
+// request, which would have made the debate views pass against the wrong data.
+globalThis.fetch = async (url) => ({
   ok: true,
   status: 200,
   statusText: 'OK',
-  json: async () => termBase,
+  json: async () => (String(url).includes('debates') ? debateBase : termBase),
 });
 
 const listeners = new Map();
@@ -298,7 +332,11 @@ const fireWindow = (type, event = {}) => {
 // -------------------------------------------------------------------- run
 
 const routes = [
-  ['#/', 'Open a debate'],
+  ['#/', 'Debates'],
+  ['#/room', 'Open a debate'],
+  ['#/debate/dharma-as-religion', 'Terms, pinned before argument'],
+  ['#/debate/dharma-as-religion/edit', 'Correspondence'],
+  ['#/debate', 'New debate'],
   ['#/terms', 'Search the term base'],
   ['#/term/hesed', 'Provenance'],
   ['#/losses', 'Loss ledger'],
@@ -307,7 +345,6 @@ const routes = [
   ['#/drafts', 'Your drafts'],
   ['#/author', 'New card'],
   ['#/statement', 'New statement'],
-  ['#/debate', 'New debate'],
   ['#/import', 'Import JSON'],
   ['#/settings', 'Settings'],
   ['#/about', 'About Witness'],
@@ -330,8 +367,11 @@ try {
 const viewRoot = byId.get('main');
 const renderedText = () => viewRoot.textContent;
 
-if (!renderedText().includes('Open a debate')) {
-  fail(`the front door did not render the room. Got: ${renderedText().slice(0, 200)}`);
+if (!renderedText().includes('Debates')) {
+  fail(`the front door did not render the debate list. Got: ${renderedText().slice(0, 200)}`);
+}
+if (!renderedText().includes('dharma')) {
+  fail('the debate list rendered no published debates');
 }
 
 for (const [hash, expected] of routes) {

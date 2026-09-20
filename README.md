@@ -26,9 +26,11 @@ The domain has a mature precedent for primitives 2 and 3: multilingual legal dra
 
 ## What it does
 
-**Debate** — the front door is a room, not a reference book:
+**Debate** — the front door is a list of debates, and the rest of the app is in service to it:
 
-- **A motion, two sides, a clock.** Pick or write a proposition, pick a format (freeform, one on one, parliamentary), name the sides. Motions can be drawn from the term base: every recorded loss is an argument waiting to be had.
+- **A debate is a motion, two sides with stated burdens, and moves that carry their evidence.** Read one as a thread: who said what and when, what each objection restates, and which objections nobody answered.
+- **Published debates live in the repository**, and git is the platform. It already provides accounts, identity, publishing, attribution, history and moderation-by-merge, so this produces records worth merging rather than building any of that again. Anyone can read one, take a side, and send back a contribution as a pull request or a file.
+- **A room for the live version.** Pick a motion, pick a format (freeform, one on one, parliamentary), and run it with a clock, phases, and points of information. Motions can be drawn from the term base: every recorded loss is an argument waiting to be had.
 - **The clock is the largest thing on the page**, because in a room the clock is what everyone is looking at. Prep, speaking time, time-up shown honestly as an overrun rather than silently wrapped.
 - **Phases with a floor.** Whose turn it is, highlighted at a glance, with next/back so the chair can correct a mistake.
 - **Adding an argument takes two fields and Enter.** Claim and the reason given. Anything slower and people stop typing while they are speaking, which is when an app stops being useful.
@@ -221,6 +223,21 @@ Someone will do this. It is worth saying plainly, in the tool and in the record,
 so that nobody can claim they were not warned: the losses here are what
 languages do to each other, and every tradition in this base has lost something
 in translation. That is the argument for recording them, not against any of them.
+
+## Contributing a debate
+
+A published debate is one file in `debates/`. To add one, or to add a move to an
+existing one:
+
+1. Read it in the app and **take a side**, which makes a local copy on your device.
+2. Add your moves there. They are stamped as you go, so nobody can alter them later without the digests failing.
+3. **Export my contribution** gives you a file containing only the moves you added.
+4. Open a pull request adding either the new debate, or your moves merged into the existing one. Or open an issue and attach the file, and somebody will do the git part.
+
+The build lints every published debate with the same rules the editor applies:
+every argument states its claim, every objection restates what it attacks, and no
+decision exists without a named person and their reasons. A debate that fails
+those rules fails the build.
 
 ## Contributing a card
 

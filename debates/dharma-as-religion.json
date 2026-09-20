@@ -1,0 +1,82 @@
+{
+  "format": "witness/debate",
+  "version": 1,
+  "id": "dharma-as-religion",
+  "motion": "Rendering “dharma” as “religion” misleads a reader.",
+  "kind": "disputation",
+  "created": "2026-09-20",
+  "terms": [
+    {
+      "term": "dharma",
+      "card": "dharma",
+      "status": "contested",
+      "agreed": "",
+      "note": "Affirming reads ‘religion’ as importing a separable-belief category the Sanskrit does not carry. Denying holds that readers meet the word alongside commentarial and legal usage which supplies the missing sense."
+    }
+  ],
+  "sides": [
+    {
+      "id": "a",
+      "name": "Affirming",
+      "position": "affirms",
+      "burden": "Establish that rendering “dharma” as “religion” misleads a reader."
+    },
+    {
+      "id": "b",
+      "name": "Denying",
+      "position": "denies",
+      "burden": "Establish that it does not, or that the difference does not matter."
+    }
+  ],
+  "moves": [
+    {
+      "id": "m1",
+      "side": "a",
+      "kind": "opening",
+      "language": "en",
+      "claim": "‘Religion’ is a modern Western category organised around belief and a separable private sphere, and dharma is not.",
+      "warrant": "The category is nineteenth-century; the Sanskrit term's field is duty, order, and practice, and does not divide into belief and secular life.",
+      "impact": "A reader who takes dharma for a religion expects a denomination and a creed, and finds neither.",
+      "targets": [],
+      "evidence": [
+        { "source": "Card: dharma — recorded loss of the “religion” rendering", "card": "dharma" }
+      ],
+      "at": "2026-09-20T10:00:00.000Z"
+    },
+    {
+      "id": "m2",
+      "side": "b",
+      "kind": "argument",
+      "language": "en",
+      "claim": "Readers who meet the word in a translation meet it again in legal and commentarial usage, which supplies the duty sense.",
+      "warrant": "Translation is a first step, and nobody reads a single word in isolation from the rest of the text.",
+      "impact": "The loss is real but recoverable, so the rendering does not mislead in practice.",
+      "targets": [],
+      "evidence": [
+        { "source": "Indian personal law statutes use ‘Hindu’ and ‘religion’ as administrative categories", "locator": "definitions section" }
+      ],
+      "at": "2026-09-20T10:20:00.000Z"
+    },
+    {
+      "id": "m3",
+      "side": "a",
+      "kind": "objection",
+      "language": "en",
+      "claim": "That recovery reaches only readers who already suspect the word is doing something else.",
+      "steelman": "The denying side is right that translation is a first step and that legal usage carries the duty sense. The objection is not that this is false but that it depends on the reader having a reason to look further, which a rendering that reads as familiar does not supply.",
+      "targets": ["m2"],
+      "evidence": [],
+      "at": "2026-09-20T10:40:00.000Z"
+    }
+  ],
+  "concessions": [
+    { "move": "m2", "side": "a", "state": "conceded", "note": "Conceded that legal usage does carry the duty sense." }
+  ],
+  "adjudication": {
+    "state": "unresolved",
+    "adjudicator": "",
+    "decision": "",
+    "reasons": "Both sides agreed the loss is real and disagreed about whether it misleads. The disagreement turned out to be about readers rather than about the word, which is worth noticing before anyone argues it again."
+  },
+  "provenance_note": "Seed debate, written as an example of the format. Not a transcript: nobody actually argued this. Every claim is drawn from the dharma card's cited losses, and the disagreement is a real one in the literature about the category ‘religion’."
+}

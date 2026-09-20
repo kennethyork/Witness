@@ -13,7 +13,7 @@
  * request in this file that sends content anywhere.
  */
 
-import { loadTermBase } from './terms.js';
+import { loadTermBase, loadPublishedDebates } from './terms.js';
 import { buildIndex, search, facets, encodeSearch, decodeSearch } from './search.js';
 import { cardDigest } from './hash.js';
 import { citeCard, citeCardBibtex, cardToMarkdown, citeStatement, permalink } from './cite.js';
@@ -24,7 +24,7 @@ import { blankStatement, statementId } from './parity.js';
 import { el, clear, download, copyText } from './dom.js';
 import {
   buildSearchPanel, cardListItem, termView, lossesView, matrixView, compareView,
-  aboutView, messageView,
+  debatesView, debateThreadView, aboutView, messageView,
 } from './ui.js';
 import { cardEditorView, draftsView, statementEditorView, debateEditorView, settingsView, importView } from './editor.js';
 import { debateRoomView } from './room-view.js';
@@ -34,6 +34,7 @@ import {
 import {
   blankDebate, debateSlug, lintDebate, debateToMarkdown,
   stampChain, restampAll, contributionFor, mergeContribution,
+  nextMoveId, transcriptDigest, termsDigest,
 } from './debate.js';
 import {
   loadDraftCards, saveDraftCard, deleteDraftCard,
@@ -59,6 +60,8 @@ const state = {
   statements: [],
   debates: [],
   session: loadSession() || blankSession(),
+  published: [],
+  debateDigest: null,
   settings: loadSettings(),
   storageOk: storageAvailable(),
   results: [],
@@ -75,7 +78,7 @@ main.append(browse, view, toastNode);
 
 // -------------------------------------------------------------------- routing
 
-const ROUTES = ['room', 'terms', 'term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'debate', 'import', 'settings', 'about'];
+const ROUTES = ['debates', 'room', 'terms', 'term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'debate', 'import', 'settings', 'about'];
 
 function parseRoute() {
   const raw = location.hash.replace(/^#/, '') || '/';
@@ -83,17 +86,23 @@ function parseRoute() {
   const parts = pathPart.split('/').filter(Boolean);
   const params = new URLSearchParams(queryPart);
   if (!parts.length) {
-    // The room is the front door now, and the term base lives at #/terms. A
-    // link to a search, like #/?q=hesed, still belongs to the term base and
-    // still works: nothing that was ever cited should break because the home
-    // page changed.
+    // The home is the debates. A link to a search, like #/?q=hesed, still
+    // belongs to the term base and still works: nothing that was ever cited
+    // should break because the home page changed a third time.
     const looksLikeSearch = ['q', 'languages', 'originLanguages', 'statuses', 'traditions']
       .some((key) => params.has(key));
-    return { name: looksLikeSearch ? 'terms' : 'room', params };
+    return { name: looksLikeSearch ? 'terms' : 'debates', params };
   }
-  const [head, second] = parts;
+  const [head, second, third] = parts;
   if (!ROUTES.includes(head)) return { name: 'notfound', params };
-  return { name: head, id: second ? decodeURIComponent(second) : null, params };
+  return {
+    name: head,
+    id: second ? decodeURIComponent(second) : null,
+    // `#/debate/:id/edit`. Reading a debate and editing it are different things,
+    // and the reading view should never look like the form.
+    action: third || null,
+    params,
+  };
 }
 
 function go(route) {
@@ -387,10 +396,56 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }).node);
       break;
     }
+    case 'debates': {
+      document.title = 'Debates — Witness';
+      setView(debatesView({
+        published: state.published,
+        mine: state.debates,
+        debateDigest: state.debateDigest,
+        actions: {
+          createDebate: () => go('/debate'),
+          openRoom: () => go('/room'),
+          importContribution: () => go('/import'),
+          takeSide: (debate) => takeSide(debate),
+          edit: (debate) => go(`/debate/${encodeURIComponent(debate.id)}/edit`),
+          remove: (id) => { removeDraft(id); render(); },
+        },
+      }));
+      break;
+    }
     case 'debate': {
+      // Reading and editing are separate views on purpose: a form is the wrong
+      // thing to read an argument in, and this is a text platform.
+      if (route.id && route.action !== 'edit') {
+        const local = state.debates.find((d) => d.id === route.id) || null;
+        const publishedCopy = state.published.find((d) => d.id === route.id) || null;
+        const shown = local || publishedCopy;
+        if (!shown) {
+          document.title = 'No such debate — Witness';
+          setView(messageView('No such debate', `Nothing here has the id “${route.id}”.`, { tone: 'error' }));
+          break;
+        }
+        document.title = `${shown.motion || shown.id} — Witness`;
+        setView(debateThreadView({
+          debate: shown,
+          digest: transcriptDigest(shown.moves),
+          mine: local,
+          published: !local,
+          cards: state.cards,
+          actions: {
+            takeSide: () => takeSide(shown),
+            addMove: (sideId, move) => addMove(shown, sideId, move),
+            edit: () => go(`/debate/${encodeURIComponent(shown.id)}/edit`),
+            contribute: () => exportMyContribution(shown),
+            copyMarkdown: () => copyAndSay(debateToMarkdown(shown), 'The record copied as Markdown.'),
+          },
+        }));
+        break;
+      }
+
       const openDebate = route.id ? state.debates.find((d) => d.id === route.id) : null;
       const working = openDebate || blankDebate();
-      document.title = openDebate ? `${openDebate.motion || openDebate.id} — Witness` : 'New debate — Witness';
+      document.title = openDebate ? `Editing ${openDebate.motion || openDebate.id} — Witness` : 'New debate — Witness';
       setView(debateEditorView({
         debate: working,
         cards: state.cards,
@@ -516,6 +571,97 @@ function produceRecord(session) {
   clearSession();
   toast('The room is now a debate record. Nothing was uploaded.');
   go(`/debate/${encodeURIComponent(record.id)}`);
+}
+
+/**
+ * Take a side in a published debate.
+ *
+ * Makes a local copy. The published record is untouched: this is your side of
+ * the correspondence, and it only reaches anyone when you export it.
+ */
+function takeSide(debate) {
+  const existing = state.debates.find((d) => d.id === debate.id);
+  if (existing) {
+    toast('You already have a copy of this debate.');
+    render();
+    return;
+  }
+  const copy = JSON.parse(JSON.stringify(debate));
+  copy.provenance_note = `Your copy of the published debate “${debate.motion}”. Moves you add are yours; the published record is unchanged until somebody merges a contribution.`;
+  saveDebate(copy);
+  state.debates = loadDebates();
+  toast('Copied to your device. Add a move and export it as a contribution.');
+  render();
+}
+
+/** Add a move in the thread, then stamp and save the local copy. */
+function addMove(debate, sideId, { claim = '', support = '' } = {}) {
+  if (!claim.trim()) {
+    toast('A move needs a claim.', { tone: 'warn' });
+    return;
+  }
+  debate.moves = debate.moves || [];
+  debate.moves.push({
+    id: nextMoveId(debate),
+    side: sideId,
+    kind: 'argument',
+    language: '',
+    claim: claim.trim(),
+    warrant: support.trim(),
+    steelman: '',
+    impact: '',
+    targets: [],
+    evidence: [],
+    at: new Date().toISOString(),
+  });
+  const stamp = stampChain(debate);
+  saveDebate(debate);
+  state.debates = loadDebates();
+  toast(stamp.ok ? 'Added to your copy.' : `Added, but move ${stamp.index + 1} no longer matches its digest.`, { tone: stamp.ok ? '' : 'error' });
+  render({ moveFocus: false });
+}
+
+/**
+ * Export only the moves you added.
+ *
+ * Your contribution is the difference between your copy and the published
+ * record: everything else is somebody else's words, and sending them back would
+ * be pointless at best.
+ */
+function exportMyContribution(debate) {
+  const publishedCopy = state.published.find((d) => d.id === debate.id);
+  const publishedIds = new Set((publishedCopy?.moves || []).map((move) => move.id));
+  const mine = (debate.moves || []).filter((move) => !publishedIds.has(move.id));
+
+  if (!mine.length) {
+    toast('You have not added a move yet, so there is nothing of yours to send.', { tone: 'warn' });
+    return;
+  }
+
+  const stamp = stampChain(debate);
+  if (!stamp.ok) {
+    toast(`Not exported: move ${stamp.index + 1} no longer matches what it was stamped with.`, { sticky: true, tone: 'error' });
+    return;
+  }
+  saveDebate(debate);
+  state.debates = loadDebates();
+
+  download(
+    filename('contribution', `${debate.id}-${mine[0].side || 'side'}`, 'json'),
+    `${JSON.stringify({
+      format: 'witness/contribution',
+      version: 1,
+      debate: { id: debate.id, motion: debate.motion },
+      side: mine[0]?.side || '',
+      author: '',
+      at: new Date().toISOString(),
+      basedOn: transcriptDigest(publishedCopy?.moves || []),
+      terms: debate.terms || [],
+      termsDigest: termsDigest(debate.terms),
+      moves: mine,
+    }, null, 2)}\n`
+  );
+  toast(`Contribution downloaded: ${mine.length} move(s) of yours. Send the file; nothing was uploaded.`);
 }
 
 function saveDebateDraft(debate) {
@@ -826,7 +972,8 @@ function buildPalette() {
   );
 
   const commands = [
-    { label: 'Debate room', route: '/' },
+    { label: 'Debates', route: '/' },
+    { label: 'Debate room', route: '/room' },
     { label: 'Term base', route: '/terms' },
     { label: 'Loss ledger', route: '/losses' },
     { label: 'Concepts by language', route: '/matrix' },
@@ -962,6 +1109,11 @@ async function boot() {
   state.index = buildIndex(state.cards);
   state.facetData = facets(state.index);
   for (const entry of state.index) state.digests.set(entry.id, cardDigest(entry.card));
+
+  // Published debates are optional: a missing set is not a failure.
+  const publishedDebates = await loadPublishedDebates().catch(() => ({ digest: null, debates: [] }));
+  state.published = publishedDebates.debates || [];
+  state.debateDigest = publishedDebates.digest || null;
 
   state.drafts = loadDraftCards();
   state.statements = loadStatements();

@@ -11,6 +11,8 @@
 
 import { el, bdi, block, langChip, definitionList, languageText, langName, clear } from './dom.js';
 import { STATUS_LABELS } from './search.js';
+import { MOVE_KIND_LABELS, debateState } from './debate.js';
+import { TERM_STATE_LABELS } from './room.js';
 
 // ------------------------------------------------------------------ shared bits
 
@@ -532,6 +534,239 @@ function compareColumn(card, side) {
     block('p', card.concept.gloss, { class: 'term-gloss' }),
     card.origin?.term ? block('p', card.origin.term, { class: 'origin-term small', lang: card.origin.language, dir: 'auto' }) : null,
     el('ul', { class: 'chips' }, reviewedChips(card))
+  );
+}
+
+// ------------------------------------------------------------ debate thread
+
+/**
+ * A debate read as a thread.
+ *
+ * This is the shape a text debate platform needs: the exchange in order, each
+ * move with who said it and when, objections showing what they restate, and the
+ * unanswered ones marked. The editor is a form and a form is the wrong thing to
+ * read an argument in.
+ */
+export function debateThreadView({
+  debate, digest, mine = null, published = false, cards = [], actions,
+}) {
+  const state = debateState(debate);
+  const sideName = (id) => (debate.sides || []).find((side) => side.id === id)?.name || id || 'someone';
+  const answeredBy = (id) => (debate.moves || []).filter((move) => (move.targets || []).includes(id));
+  const index = (id) => (debate.moves || []).findIndex((move) => move.id === id) + 1;
+
+  const move = (entry, number) => {
+    const answers = answeredBy(entry.id);
+    const isObjection = entry.kind === 'objection';
+    const unanswered = isObjection && !answers.some((answer) => answer.kind === 'response');
+
+    return el('li', { class: `thread-move thread-${entry.side} ${unanswered ? 'thread-unanswered' : ''}` },
+      el('header', { class: 'thread-move-head' },
+        el('span', { class: 'thread-number', text: `${number}` }),
+        el('span', { class: 'thread-kind', text: MOVE_KIND_LABELS[entry.kind] || entry.kind }),
+        block('span', sideName(entry.side), { class: 'thread-side' }),
+        entry.language ? langChip(entry.language) : null,
+        entry.at ? el('span', { class: 'thread-time', text: String(entry.at).slice(0, 16).replace('T', ' ') }) : null
+      ),
+      (entry.targets || []).length
+        ? el('p', { class: 'thread-targets', text: `Answers ${entry.targets.map((target) => `#${index(target)}`).join(', ')}` })
+        : null,
+      isObjection && entry.steelman
+        ? el('blockquote', { class: 'thread-steelman' },
+            el('span', { class: 'thread-label', text: 'Restated at its strongest: ' }),
+            block('span', entry.steelman, {})
+          )
+        : null,
+      block('p', entry.claim, { class: 'thread-claim' }),
+      entry.warrant ? el('p', { class: 'thread-warrant' }, el('span', { class: 'thread-label', text: 'Because ' }), block('span', entry.warrant, {})) : null,
+      (entry.evidence || []).length
+        ? el('ul', { class: 'thread-evidence' }, entry.evidence.map((item) =>
+            el('li', {},
+              block('span', item.source, {}),
+              item.locator ? el('span', { class: 'source-meta', text: ` · ${item.locator}` }) : null,
+              item.card ? el('a', { class: 'lang', href: `#/term/${encodeURIComponent(item.card)}`, text: item.card }) : null
+            )
+          ))
+        : null,
+      entry.impact ? el('p', { class: 'thread-impact' }, el('span', { class: 'thread-label', text: 'Why it matters: ' }), block('span', entry.impact, {})) : null,
+      isObjection
+        ? el('p', { class: `thread-state ${unanswered ? 'thread-state-alert' : ''}`, text: unanswered ? 'Left unanswered' : `Answered by ${answers.filter((answer) => answer.kind === 'response').map((answer) => `#${index(answer.id)}`).join(', ')}` })
+        : answers.length
+          ? el('p', { class: 'thread-state', text: `Answered by ${answers.map((answer) => `#${index(answer.id)}`).join(', ')}` })
+          : null,
+      entry.digest ? el('p', { class: 'thread-digest', text: entry.digest.slice(0, 12) }) : null
+    );
+  };
+
+  return el('article', { class: 'thread' },
+    el('p', { class: 'crumb' }, el('a', { href: '#/', text: '← Debates' })),
+    block('h2', debate.motion || 'Untitled motion', { class: 'thread-motion', tabindex: '-1' }),
+
+    el('ul', { class: 'chips' },
+      el('li', { class: 'chip', text: debate.kind || 'disputation' }),
+      el('li', { class: 'chip', text: `${state.moves} move(s)` }),
+      state.decided
+        ? el('li', { class: 'chip chip-ok', text: `decided: ${debate.adjudication.decision || 'yes'}` })
+        : el('li', { class: 'chip chip-muted', text: debate.adjudication?.state === 'unresolved' ? 'nobody moved' : 'no decision' }),
+      published ? el('li', { class: 'chip chip-muted', text: 'published' }) : el('li', { class: 'chip chip-warn', text: 'your copy' }),
+      digest ? el('li', { class: 'chip', text: `revision ${String(digest).slice(0, 12)}` }) : null
+    ),
+
+    (debate.terms || []).length
+      ? el('section', { class: 'thread-terms' },
+          el('h3', { text: 'Terms, pinned before argument' }),
+          el('ul', {}, debate.terms.map((term) =>
+            el('li', {},
+              el('span', { class: 'thread-term-word', auto: term.term }),
+              el('span', { class: 'lang', text: TERM_STATE_LABELS[term.status] || term.status }),
+              term.card ? el('a', { class: 'lang', href: `#/term/${encodeURIComponent(term.card)}`, text: term.card }) : null,
+              block('p', term.status === 'settled' ? term.agreed : term.note, { class: 'thread-term-note' })
+            )
+          ))
+        )
+      : el('p', { class: 'hint', text: 'No terms were pinned. Some of this may be a disagreement about a word rather than about doctrine.' }),
+
+    el('ol', { class: 'thread-list' }, (debate.moves || []).map((entry, position) => move(entry, position + 1))),
+    !(debate.moves || []).length ? el('p', { class: 'empty', text: 'No moves yet.' }) : null,
+
+    el('section', { class: 'thread-state-panel' },
+      el('h3', { text: 'Where it stands' }),
+      el('p', { class: 'hint', text: 'Facts about the record, not a verdict. Nothing here decides anything.' }),
+      el('ul', { class: 'stats' },
+        stat(state.unanswered.length, 'objections unanswered'),
+        stat(state.unsupported.length, 'arguments citing nothing'),
+        stat(state.unwarranted.length, 'arguments with no warrant'),
+        stat(state.unpinnedTerms.length, 'terms unpinned')
+      ),
+      state.unanswered.length
+        ? el('div', { class: 'signals' },
+            el('h4', { text: 'Nobody answered' }),
+            el('ul', {}, state.unanswered.map((entry) => el('li', { text: `#${index(entry.id)} — ${entry.claim || entry.id}` })))
+          )
+        : null,
+      debate.adjudication?.state === 'decided'
+        ? el('div', {},
+            el('h4', { text: `Decided by ${debate.adjudication.adjudicator}` }),
+            block('p', debate.adjudication.reasons || '', { class: 'provenance' })
+          )
+        : el('p', { class: 'hint', text: debate.adjudication?.state === 'unresolved' ? 'Recorded as unresolved. In a dispute about words that is often the honest answer.' : 'Still open.' })
+    ),
+
+    (debate.provenance_note || '').trim()
+      ? el('section', { class: 'section' },
+          el('h3', { text: 'How this debate came to exist' }),
+          block('p', debate.provenance_note, { class: 'provenance' })
+        )
+      : null,
+
+    mine
+      ? replyComposer(debate, actions)
+      : el('div', { class: 'thread-take' },
+          el('p', { class: 'hint', text: 'You can take a side. That makes a copy of this debate on your device, which you can add to and send back as a contribution. The published record stays as it is until somebody merges yours.' }),
+          button('Take a side', () => actions.takeSide())
+        ),
+
+    actionsBar(
+      mine ? button('Edit my copy in full', () => actions.edit(), { class: 'ghost' }) : null,
+      mine ? button('Export my contribution', () => actions.contribute(), { class: 'ghost' }) : null,
+      button('Copy the record', () => actions.copyMarkdown(), { class: 'ghost' }),
+      button('Print', () => window.print(), { class: 'ghost' })
+    )
+  );
+}
+
+/**
+ * Two fields and Enter, in the thread.
+ *
+ * The same shape as the room's composer, for the same reason: a text platform
+ * that takes four fields to answer somebody will not get answered.
+ */
+function replyComposer(debate, actions) {
+  const side = el('select', {}, (debate.sides || []).map((entry) =>
+    el('option', { value: entry.id, text: `${entry.name || entry.id} — ${entry.position || ''}`.trim() })
+  ));
+  const claim = el('input', { type: 'text', dir: 'auto', placeholder: 'What you are claiming…', autocomplete: 'off' });
+  const support = el('input', { type: 'text', dir: 'auto', placeholder: 'the reason (optional)', autocomplete: 'off' });
+
+  const submit = () => {
+    if (!claim.value.trim()) {
+      claim.focus();
+      return;
+    }
+    actions.addMove(side.value, { claim: claim.value, support: support.value });
+  };
+  for (const input of [claim, support]) {
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      submit();
+    });
+  }
+
+  return el('section', { class: 'thread-composer' },
+    el('h3', { text: 'Add a move' }),
+    el('p', { class: 'hint', text: 'It goes into your copy on this device. Export a contribution to send it; nothing is uploaded, and the other side cannot alter your words without their digests failing.' }),
+    el('div', { class: 'room-add' }, side, claim, support, button('Add', submit, { class: 'tiny' }))
+  );
+}
+
+// ---------------------------------------------------------------- the list
+
+/** The home screen: the debates, not a reference book. */
+export function debatesView({ published = [], mine = [], debateDigest = null, actions }) {
+  const card = (debate, { isMine = false } = {}) => {
+    const state = debateState(debate);
+    return el('li', { class: 'debate-card' },
+      el('a', { href: `#/debate/${encodeURIComponent(debate.id)}` },
+        block('span', debate.motion || 'Untitled motion', { class: 'debate-motion' }),
+        el('span', { class: 'debate-meta' },
+          el('span', { class: 'lang', text: `${state.moves} move(s)` }),
+          (debate.sides || []).length
+            ? el('span', { class: 'lang', text: (debate.sides || []).map((side) => side.name || side.id).join(' v ') })
+            : null,
+          (debate.terms || []).length
+            ? el('span', { class: 'lang', text: `${debate.terms.length} term(s) pinned` })
+            : el('span', { class: 'status status-warn', text: 'terms not pinned' }),
+          state.unanswered.length
+            ? el('span', { class: 'status status-alert', text: `${state.unanswered.length} unanswered` })
+            : null,
+          state.decided
+            ? el('span', { class: 'status status-ok', text: debate.adjudication.decision || 'decided' })
+            : null,
+          isMine ? el('span', { class: 'status status-warn', text: 'your copy' }) : null
+        )
+      ),
+      el('div', { class: 'debate-actions' },
+        button('Take a side', () => actions.takeSide(debate), { class: 'ghost tiny' }),
+        isMine ? button('Edit', () => actions.edit(debate), { class: 'ghost tiny' }) : null,
+        isMine ? button('Delete', () => actions.remove(debate.id), { class: 'ghost tiny danger' }) : null
+      )
+    );
+  };
+
+  const mineIds = new Set(mine.map((debate) => debate.id));
+  const publishedOnly = published.filter((debate) => !mineIds.has(debate.id));
+
+  return el('article', { class: 'debates' },
+    el('h2', { text: 'Debates', tabindex: '-1' }),
+    el('p', { class: 'lede', text: 'A motion, two sides with stated burdens, and moves that carry their evidence. Read any of them, take a side, and send back a contribution. Nothing is uploaded and there are no accounts: published debates are files in the repository, and your own stay on this device until you export one.' }),
+
+    el('div', { class: 'actions' },
+      button('Start a debate', () => actions.createDebate()),
+      button('Open the room', () => actions.openRoom(), { class: 'ghost' }),
+      button('Import a contribution', () => actions.importContribution(), { class: 'ghost' })
+    ),
+    debateDigest ? el('p', { class: 'hint', text: `Published revision ${String(debateDigest).slice(0, 16)}` }) : null,
+
+    sectionHeading('Published', { note: 'Files in the repository, merged by pull request. Read one and argue back.' }),
+    publishedOnly.length
+      ? el('ul', { class: 'debate-list' }, publishedOnly.map((debate) => card(debate)))
+      : el('p', { class: 'empty', text: 'Nothing published yet.' }),
+
+    sectionHeading('Yours', { note: 'On this device. Export a contribution to send one to the other side.' }),
+    mine.length
+      ? el('ul', { class: 'debate-list' }, mine.map((debate) => card(debate, { isMine: true })))
+      : el('p', { class: 'empty', text: 'Nothing of your own yet. Take a side in a published debate, or start one.' })
   );
 }
 

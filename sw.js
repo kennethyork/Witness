@@ -10,7 +10,7 @@
  * included. A stale stylesheet is indistinguishable from a bug.
  */
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `witness-${VERSION}`;
 
 const ASSETS = [
@@ -40,6 +40,7 @@ const ASSETS = [
   './app/export.js',
   './app/store.js',
   './data/terms.json',
+  './data/debates.json',
 ];
 
 const absolute = (path) => new URL(path, self.location).toString();

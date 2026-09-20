@@ -423,6 +423,63 @@ body.palette-open { overflow: hidden; }
 .toast.error { background: var(--rubric); color: var(--on-highlight); }
 .citation-block { margin: 0.5rem 0 0; white-space: pre-wrap; font-size: 0.8rem; }
 
+/* ------------------------------------------------------------- the debates
+   The home screen is a list of debates, so it should read like one: motion
+   first, then what state it is in. */
+
+.debate-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.debate-card {
+  display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; justify-content: space-between; align-items: baseline;
+  border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.8rem 1rem;
+  background: var(--paper-raised);
+}
+.debate-card > a { display: grid; gap: 0.35rem; text-decoration: none; flex: 1 1 22rem; }
+.debate-motion { font-family: var(--font-text); font-size: 1.2rem; }
+.debate-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.debate-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+/* ------------------------------------------------------------ the thread */
+
+.thread-motion { font-family: var(--font-text); font-size: 1.8rem; margin: 0 0 0.6rem; }
+.thread-terms { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.8rem 1rem; margin-block: 1rem; }
+.thread-terms h3 { margin-block-start: 0; }
+.thread-terms ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.thread-terms li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; }
+.thread-term-word { font-family: var(--font-text); font-size: 1.2rem; }
+.thread-term-note { flex: 1 1 100%; margin: 0; font-size: 0.9rem; color: var(--ink-soft); }
+
+.thread-list { list-style: none; margin: 1.2rem 0 0; padding: 0; display: grid; gap: 1rem; }
+.thread-move {
+  border-inline-start: 3px solid var(--rule-strong); padding: 0.2rem 0 0.2rem 0.9rem;
+}
+/* Two sides, distinguishable at a glance without claiming one is right. */
+.thread-a { border-inline-start-color: var(--rubric); }
+.thread-b { border-inline-start-color: var(--accent-ok); }
+.thread-unanswered { background: var(--tint); }
+.thread-move-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; margin-block-end: 0.4rem; }
+.thread-number { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-faint); }
+.thread-kind { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.thread-side { font-family: var(--font-text); font-size: 1.05rem; }
+.thread-time { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }
+.thread-targets { margin: 0 0 0.3rem; font-size: 0.78rem; color: var(--ink-faint); font-family: var(--font-mono); }
+.thread-steelman {
+  margin: 0 0 0.6rem; padding: 0.5rem 0.8rem;
+  border-inline-start: 3px solid var(--accent-warn);
+  background: var(--sunken); font-size: 0.92rem; color: var(--ink-soft);
+}
+.thread-label { color: var(--ink-faint); font-size: 0.78rem; }
+.thread-claim { margin: 0 0 0.3rem; font-family: var(--font-text); font-size: 1.08rem; }
+.thread-warrant, .thread-impact { margin: 0 0 0.3rem; font-size: 0.95rem; color: var(--ink-soft); }
+.thread-evidence { list-style: none; margin: 0 0 0.3rem; padding: 0; font-size: 0.85rem; color: var(--ink-faint); }
+.thread-evidence li { padding-block: 0.1rem; }
+.thread-state { margin: 0.3rem 0 0; font-size: 0.8rem; color: var(--ink-faint); }
+.thread-state-alert { color: var(--rubric); font-weight: 600; }
+.thread-digest { margin: 0.2rem 0 0; font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-faint); }
+
+.thread-state-panel { margin-block-start: 2rem; border-block-start: 1px solid var(--rule-strong); padding-block-start: 1rem; }
+.thread-take, .thread-composer { margin-block-start: 1.6rem; border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.9rem 1rem; }
+.thread-composer h3 { margin-block-start: 0; }
+
 /* ------------------------------------------------------------ the room
    The clock is the largest thing on the page, because in a room the clock is
    what everyone is looking at. */

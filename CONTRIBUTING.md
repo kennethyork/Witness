@@ -67,6 +67,18 @@ The **statement editor** (`Drafts → New statement`) is for a text that exists 
 
 This is the tool to use **before** you have a document to circulate, not instead of one. When you are ready, **Export for circulation (Markdown)** gives you something to send to the parties.
 
+## Contributing to a debate
+
+Debates are `witness/debate` records in `debates/`, one file each. The same rule
+applies as everywhere else, with two additions:
+
+- **An objection must restate what it attacks, at its strongest.** The build rejects an objection without it. This is the only structural defence against strawmarshalling an argument you have not engaged with, and it is not negotiable.
+- **A decision needs a named person and reasons.** If nobody moved, record that instead: `unresolved` is a legitimate outcome and often the honest one.
+
+To argue back against a published debate, use the app: read it, take a side, add
+your moves, and export your contribution. That file contains only the moves you
+added, and it is what a pull request should carry.
+
 ## What does not belong here
 
 **Restorative justice case data, or any statement made by a harmed person.** Not in the repository, not in an issue, not in a pull request, not in a screenshot of one. See the boundary table in the [README](../README.md). If you are working on that material, it never touches this project's hosting.

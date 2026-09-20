@@ -1,0 +1,94 @@
+{
+  "format": "witness/debate",
+  "version": 1,
+  "id": "hesed-as-loving-kindness",
+  "motion": "Rendering “hesed” as “loving-kindness” misleads a modern reader.",
+  "kind": "disputation",
+  "created": "2026-09-20",
+  "terms": [
+    {
+      "term": "hesed",
+      "card": "hesed",
+      "status": "settled",
+      "agreed": "For the purposes of this debate: the loyalty, generosity and reliability that bind parties in a covenant, whether or not affection is present.",
+      "note": ""
+    }
+  ],
+  "sides": [
+    {
+      "id": "a",
+      "name": "Affirming",
+      "position": "affirms",
+      "burden": "Establish that the compound misleads a modern reader."
+    },
+    {
+      "id": "b",
+      "name": "Denying",
+      "position": "denies",
+      "burden": "Establish that it carries the sense well enough, or that the drift is not the word's fault."
+    }
+  ],
+  "moves": [
+    {
+      "id": "m1",
+      "side": "a",
+      "kind": "opening",
+      "language": "en",
+      "claim": "Coverdale coined the compound in 1535 and it has drifted toward sentiment ever since.",
+      "warrant": "A compound made to fill a gap is read by later readers through their own vocabulary, and ‘kindness’ has narrowed toward warmth.",
+      "impact": "A reader hears warmth where the Hebrew carries obligation between covenant partners.",
+      "targets": [],
+      "evidence": [
+        { "source": "Card: hesed — the loss recorded for ‘loving-kindness’", "card": "hesed", "locator": "Coverdale, 1535" }
+      ],
+      "at": "2026-09-20T11:00:00.000Z"
+    },
+    {
+      "id": "m2",
+      "side": "b",
+      "kind": "argument",
+      "language": "en",
+      "claim": "The drift is a fact about English, not about this rendering: every candidate has drifted, and ‘steadfast love’ loses the covenantal dimension just as badly.",
+      "warrant": "If every available rendering loses something, the choice is between recorded losses rather than between a loss and no loss.",
+      "impact": "So the motion is not about loving-kindness; it is about translation, and it is true of all the alternatives.",
+      "targets": [],
+      "evidence": [
+        { "source": "Card: hesed — alternate renderings and what each one drops", "card": "hesed" }
+      ],
+      "at": "2026-09-20T11:15:00.000Z"
+    },
+    {
+      "id": "m3",
+      "side": "a",
+      "kind": "objection",
+      "language": "en",
+      "claim": "That defence would equally excuse the worst rendering available.",
+      "steelman": "The denying side is right that every rendering loses something and that the motion is really about translation as such. The objection is that this argument, unqualified, would defend any rendering at all, including ones the denying side would reject, so it cannot be doing the work being asked of it.",
+      "targets": ["m2"],
+      "evidence": [],
+      "at": "2026-09-20T11:30:00.000Z"
+    },
+    {
+      "id": "m4",
+      "side": "b",
+      "kind": "response",
+      "language": "en",
+      "claim": "It is not unqualified: the defence is that this rendering is among the better options, not that any rendering would do.",
+      "warrant": "The claim to meet is comparative, and the comparison is against the alternatives actually in use.",
+      "impact": "The motion as worded is too strong; a motion about which rendering is least misleading would be arguable, and this one is not.",
+      "targets": ["m3"],
+      "evidence": [],
+      "at": "2026-09-20T11:45:00.000Z"
+    }
+  ],
+  "concessions": [
+    { "move": "m4", "side": "a", "state": "conceded", "note": "Conceded that the motion as worded is stronger than the case made for it." }
+  ],
+  "adjudication": {
+    "state": "decided",
+    "adjudicator": "Seed adjudicator",
+    "decision": "Against the motion",
+    "reasons": "The affirming side established that a loss exists, which the denying side granted. It did not establish that this rendering misleads readers more than the alternatives, and the motion as worded claims exactly that. The debate was won on the wording of the motion, which is usually a sign that the motion was badly written rather than that the argument was lost."
+  },
+  "provenance_note": "Seed debate, written as an example of the format. Not a transcript: nobody actually argued this, and the adjudicator is a placeholder rather than a person. It is included because the outcome is instructive: the motion was too strong for the case, and the record says so."
+}
