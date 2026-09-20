@@ -31,14 +31,14 @@ export function permalink(route) {
 
 export function citeCard(card, digest, { date = today(), baseRevision = null, url = null } = {}) {
   const lines = [
-    `"${card.concept.label}" (${card.id}). Colophon term base.`,
+    `"${card.concept.label}" (${card.id}). Witness term base.`,
     `Card revision ${digest.slice(0, 16)}.`,
   ];
   if (baseRevision) lines.push(`Base revision ${baseRevision.slice(0, 16)}.`);
   if (url) lines.push(url);
   lines.push(
     `Retrieved ${date}. Data licence CC BY-SA 4.0.`,
-    `Concepts are attributed to traditions and sources, not to Colophon.`
+    `Concepts are attributed to traditions and sources, not to Witness.`
   );
   return lines.join('\n');
 }
@@ -49,7 +49,7 @@ export function citeRendition(card, rendition, digest, { url = null } = {}) {
     : `recorded as ${rendition.status.replace(/-/g, ' ')}`;
   return [
     `"${rendition.rendering}" (${rendition.language}) for "${card.concept.label}" (${card.id}), ${status}.`,
-    `Colophon term base, card revision ${digest.slice(0, 16)}.`,
+    `Witness term base, card revision ${digest.slice(0, 16)}.`,
     rendition.loss ? `Loss recorded: ${rendition.loss}` : null,
     url,
   ]
@@ -59,13 +59,13 @@ export function citeRendition(card, rendition, digest, { url = null } = {}) {
 
 /** For people writing papers, which is most of the people who want this. */
 export function citeCardBibtex(card, digest, { url = null, year = null } = {}) {
-  const key = `colophon:${card.id}:${digest.slice(0, 8)}`;
+  const key = `witness:${card.id}:${digest.slice(0, 8)}`;
   const fields = [
     `  title = {${bibtexEscape(card.concept.label)}}`,
-    `  note = {Colophon term base, card revision ${digest.slice(0, 16)}}`,
+    `  note = {Witness term base, card revision ${digest.slice(0, 16)}}`,
     `  year = {${year || new Date().getFullYear()}}`,
     url ? `  howpublished = {\\url{${url}}}` : null,
-    '  organization = {Colophon}',
+    '  organization = {Witness}',
   ].filter(Boolean);
 
   return [`@misc{${key},`, fields.join(',\n'), '}'].join('\n');
@@ -116,7 +116,7 @@ export function cardToMarkdown(card, digest, { url = null } = {}) {
       ? `Reviewed by ${(card.contributors || []).filter((c) => c.role === 'reviewer').map((r) => r.name).join(', ')}.`
       : '**Unreviewed.** No named reviewer has signed this card.',
     '',
-    `Colophon, card revision ${digest.slice(0, 16)}. Data licence CC BY-SA 4.0.${url ? ` ${url}` : ''}`
+    `Witness, card revision ${digest.slice(0, 16)}. Data licence CC BY-SA 4.0.${url ? ` ${url}` : ''}`
   );
 
   return lines.join('\n');

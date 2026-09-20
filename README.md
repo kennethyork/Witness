@@ -1,12 +1,12 @@
-# Colophon
+# Witness
 
-**No claim without a colophon.**
+**No claim without a witness.**
 
 A cited term base for interfaith translation, plus a parity tracker for multi-language statements. Every card records how each tradition renders a concept and, more importantly, **what each rendering loses**. "No equivalent" is a citable claim here, not a failure state.
 
-Live site: <https://kennethyork.github.io/Witness-/> — static, no server, no accounts, no dependencies.
+Live site: <https://witness.studytools.cc/> — static, no server, no accounts, no dependencies.
 
-Repository: <https://github.com/kennethyork/Witness->
+Repository: <https://github.com/kennethyork/Witness->, which also serves the site at <https://kennethyork.github.io/Witness-/> (that URL redirects to the domain above).
 
 ---
 
@@ -89,7 +89,15 @@ Browsers refuse to load ES modules over `file://`, so opening `index.html` from 
 3. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 4. [`.github/workflows/pages.yml`](.github/workflows/pages.yml) validates the cards against the schema, runs both test suites, builds `_site/`, and deploys it.
 
-No base-path configuration is needed. Every asset is referenced relatively and the app fetches its data relative to its own module URL, so it runs at `/`, at `/colophon/`, on a user page, or on a custom domain without changes.
+No base-path configuration is needed. Every asset is referenced relatively and the app fetches its data relative to its own module URL, so it runs at `/`, at `/Witness-/`, on a user page, or on a custom domain — where it is served from the domain root — without changes.
+
+To serve it on a subdomain, claim the domain in the repository settings **before** pointing DNS at it (GitHub's own warning: a domain configured in DNS but unclaimed can be taken over by another repository). Then add one record:
+
+| type | name | value |
+|---|---|---|
+| `CNAME` | your subdomain label | `kennethyork.github.io` |
+
+No `CNAME` file is needed: with a GitHub Actions deployment it is ignored and not required, which is the opposite of what most guides say (they assume a branch deployment). The certificate is provisioned by Let's Encrypt automatically, up to an hour after DNS resolves; **Enforce HTTPS** becomes available once it lands. Check for `CAA` records on the domain, which can silently block issuance.
 
 Notes for whoever maintains this next:
 

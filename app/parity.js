@@ -198,7 +198,7 @@ export function statementId(statement) {
 
 export function blankStatement(kinds = STATEMENT_KINDS) {
   return {
-    format: 'colophon/statement',
+    format: 'witness/statement',
     version: 1,
     id: '',
     title: '',

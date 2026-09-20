@@ -10,8 +10,8 @@
  * included. A stale stylesheet is indistinguishable from a bug.
  */
 
-const VERSION = 'v3';
-const CACHE = `colophon-${VERSION}`;
+const VERSION = 'v4';
+const CACHE = `witness-${VERSION}`;
 
 const ASSETS = [
   './',

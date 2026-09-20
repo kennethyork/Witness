@@ -79,7 +79,7 @@ async function main() {
   const digest = baseDigest(cards);
 
   const bundle = {
-    format: 'colophon/term-base',
+    format: 'witness/term-base',
     version: 1,
     license: 'CC-BY-SA-4.0',
     digest,

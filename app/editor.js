@@ -488,8 +488,8 @@ export function cardEditorView({ draft, onSave, onExport, onDelete, onReset, onI
 // ---------------------------------------------------------------- drafts
 
 export function draftsView({ drafts, onEdit, onDelete, onExport, onCreate, onImport }) {
-  const cards = drafts.filter((d) => !d.format || d.format === 'colophon/card' || d.concept);
-  const statements = drafts.filter((d) => d.format === 'colophon/statement' || d.versions);
+  const cards = drafts.filter((d) => !d.format || d.format === 'witness/card' || d.concept);
+  const statements = drafts.filter((d) => d.format === 'witness/statement' || d.versions);
 
   const list = (items, render) => items.length
     ? el('ul', { class: 'draft-list' }, items.map(render))

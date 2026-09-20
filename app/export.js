@@ -46,7 +46,7 @@ function mdCell(value) {
 
 export function toTermBaseBundle(cards, digest) {
   return {
-    format: 'colophon/term-base',
+    format: 'witness/term-base',
     version: 1,
     license: 'CC-BY-SA-4.0',
     digest: digest || null,
@@ -117,12 +117,12 @@ export function toTbx(cards) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!-- Minimal TBX-Lite profile. Losses are carried in descrip type="loss".',
-    '     Colophon, data licence CC BY-SA 4.0. Concepts belong to the traditions',
+    '     Witness, data licence CC BY-SA 4.0. Concepts belong to the traditions',
     '     that hold them, not to this project. -->',
     '<tbx style="dca" type="TBX-Lite" xml:lang="en" xmlns="urn:iso:std:iso:30042:ed-2">',
     '  <header>',
     '    <fileDesc>',
-    '      <titleStmt><title>Colophon term base</title></titleStmt>',
+    '      <titleStmt><title>Witness term base</title></titleStmt>',
     `      <sourceDesc><p>${cards.length} concept(s).</p></sourceDesc>`,
     '    </fileDesc>',
     '  </header>',
@@ -185,7 +185,7 @@ export function toLossReport(cards) {
     '# Recorded losses',
     '',
     'What each rendering drops, according to the cited source for each card.',
-    'Generated from a Colophon term base (data licence CC BY-SA 4.0).',
+    'Generated from a Witness term base (data licence CC BY-SA 4.0).',
     '',
   ];
 
@@ -238,7 +238,7 @@ export function parseStatementInput(text) {
     throw new Error(`not valid JSON — ${error.message}`);
   }
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.versions)) {
-    throw new Error('expected a Colophon statement record with a "versions" array');
+    throw new Error('expected a Witness statement record with a "versions" array');
   }
   return parsed;
 }
@@ -342,5 +342,5 @@ function approvalLines(version) {
 /** Filenames that sort usefully and say what they are. */
 export function filename(prefix, id, extension) {
   const slug = (id || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `colophon-${prefix}-${slug}.${extension}`;
+  return `witness-${prefix}-${slug}.${extension}`;
 }

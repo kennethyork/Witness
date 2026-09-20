@@ -260,8 +260,8 @@ export function termView(card, { digest, baseRevision, cards, actions }) {
       block('p', card.provenance_note, { class: 'provenance' })
     ) : null,
 
-    el('section', { class: 'section colophon-block' },
-      el('h3', { text: 'Colophon' }),
+    el('section', { class: 'section provenance-block' },
+      el('h3', { text: 'Provenance' }),
       el('p', { class: 'hint', text: 'Cite the card revision, not just the id. The id is stable; the contents are not.' }),
       definitionList([
         ['Card id', card.id],
@@ -539,7 +539,7 @@ function compareColumn(card, side) {
 
 export function aboutView({ count, baseRevision, stats }) {
   return el('article', { class: 'about' },
-    el('h2', { text: 'About Colophon', tabindex: '-1' }),
+    el('h2', { text: 'About Witness', tabindex: '-1' }),
     el('p', { text: 'A cited term base for interfaith translation. Every card records how each tradition renders a concept and, more importantly, what each rendering loses. "No equivalent" is a citable claim here, not a failure state.' }),
     el('p', { text: `This deployment carries ${count} card${count === 1 ? '' : 's'} at base revision ${baseRevision ? baseRevision.slice(0, 16) : 'unknown'}${stats ? `, spanning ${stats.languages} languages and ${stats.renditions} renderings` : ''}.` }),
 

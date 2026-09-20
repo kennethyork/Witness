@@ -1,10 +1,11 @@
-/* Colophon — base stylesheet.
+/* Witness — base stylesheet.
    No webfonts: they would be a network dependency, a tracking vector, and a
    liability for scripts we cannot anticipate. System stacks with per-script
    fallbacks instead.
-   Printer's ink and rubric red, because the colophon is a manuscript convention
-   and it should look like one. Rubrication was the second colour a scribe
-   reached for, usually to mark a word that mattered. */
+   Printer's ink and rubric red. Rubrication was the second colour a scribe
+   reached for, usually to mark the words that mattered, and a project about
+   which claims are attested should look like something a person stands
+   behind. */
 
 :root {
   --paper: #faf8f5;
@@ -268,7 +269,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--rubric); }
 .related { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .related a { font-family: var(--font-text); font-size: 1.05rem; }
 
-.colophon-block { border-block-start: 1px solid var(--rule-strong); padding-block-start: 1.1rem; }
+.provenance-block { border-block-start: 1px solid var(--rule-strong); padding-block-start: 1.1rem; }
 
 /* --------------------------------------------------------------- loss ledger */
 

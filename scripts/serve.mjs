@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * A local static server for development and for anyone who wants to run
- * Colophon from a folder without GitHub Pages.
+ * Witness from a folder without GitHub Pages.
  *
  * Browsers refuse to load ES modules and fetch() over file://, so "just open
  * index.html" does not work for a bundled app. This is the smallest thing that
@@ -109,6 +109,6 @@ server.on('clientError', (error, socket) => {
 });
 
 server.listen(port, () => {
-  console.log(`Colophon (from _site/) on http://localhost:${port}`);
+  console.log(`Witness (from _site/) on http://localhost:${port}`);
   console.log('Service worker, clipboard, and offline caching work on localhost; they do not on file://.');
 });

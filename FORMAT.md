@@ -1,6 +1,6 @@
-# Colophon — format notes
+# Witness — format notes
 
-**No claim without a colophon.** Three primitives. Everything else is interface.
+**No claim without a witness.** Three primitives. Everything else is interface.
 
 ## 1. Provenance
 
@@ -27,7 +27,7 @@ the document.
 
 ## The statement record
 
-A statement (`colophon/statement`) is the parity primitive applied to a text that
+A statement (`witness/statement`) is the parity primitive applied to a text that
 exists in several languages at once: a joint declaration, an apology, an
 agreement, a dialogue record.
 

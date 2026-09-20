@@ -2,7 +2,7 @@
  * Loading the term base.
  *
  * Fetches the built bundle relative to this module, so the app works under any
- * deployment path (/colophon/, /, a user page) without configuration.
+ * deployment path (/witness/, /, a user page) without configuration.
  */
 
 const BUNDLE_URL = new URL('../data/terms.json', import.meta.url);

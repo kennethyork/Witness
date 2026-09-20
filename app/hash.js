@@ -3,9 +3,9 @@
  *
  * Deliberately pure JavaScript rather than crypto.subtle: subtle is only
  * available in a secure context, so it is missing on file:// and on plain
- * http. The point of a colophon is that it works in ten years, on a machine
- * with no network, opened from a folder. So we do not depend on the platform
- * having a crypto API. The implementation is verified against Node's crypto
+ * http. The point of a provenance digest is that it still verifies in ten
+ * years, on a machine with no network, opened from a folder. So we do not
+ * depend on the platform having a crypto API. The implementation is verified against Node's crypto
  * in scripts/check.mjs.
  */
 

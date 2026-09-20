@@ -20,6 +20,7 @@ import {
   xmlEscape, csvCell, toCsv, toTbx, toLossReport, CSV_COLUMNS,
   parseCardsInput, parseStatementInput, statementToMarkdown, filename,
 } from '../app/export.js';
+import { migrateLegacyStorage, loadDraftCards, loadSettings } from '../app/store.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -273,7 +274,7 @@ check(
 // ------------------------------------------------------------------- parity
 
 const statement = {
-  format: 'colophon/statement',
+  format: 'witness/statement',
   version: 1,
   id: 'joint-river',
   title: 'Joint statement on the river',
@@ -409,7 +410,7 @@ check('single card JSON round-trips', parseCardsInput(JSON.stringify(hesedCard))
 check('array JSON round-trips', parseCardsInput(JSON.stringify(cards)).length === cards.length);
 check(
   'a built bundle round-trips',
-  parseCardsInput(JSON.stringify({ format: 'colophon/term-base', cards })).length === cards.length
+  parseCardsInput(JSON.stringify({ format: 'witness/term-base', cards })).length === cards.length
 );
 check('garbage is rejected with a readable message', (() => {
   try { parseCardsInput('{not json'); return false; } catch (error) { return error.message.includes('not valid JSON'); }
@@ -430,7 +431,7 @@ check('statement Markdown states the ratification fact', markdown.includes('Full
 check('statement Markdown lists open divergences', markdown.includes('Says much less'));
 check('statement Markdown cites terms relied on', markdown.includes('`shalom`'));
 check('loss report collects the losses', toLossReport(cards).includes('Recorded losses'));
-check('filename slugs safely', filename('card', 'My Card!', 'json') === 'colophon-card-my-card.json');
+check('filename slugs safely', filename('card', 'My Card!', 'json') === 'witness-card-my-card.json');
 
 // ------------------------------------------------------------------ permalinks
 
@@ -441,6 +442,52 @@ check('filter sets survive a permalink', decoded.filters.languages.has('la') && 
 check('unset facets decode to empty sets', decoded.filters.traditions.size === 0);
 check('an empty search encodes to nothing', encodeSearch({}) === '');
 check('an empty string decodes to an empty search', decodeSearch('').query === '');
+
+// ------------------------------------------- storage migration across a rename
+
+// A rename must not be a way to lose somebody's work, so this is exercised
+// against a fake localStorage rather than assumed.
+const memory = new Map();
+globalThis.localStorage = {
+  getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+  setItem: (key, value) => memory.set(key, String(value)),
+  removeItem: (key) => memory.delete(key),
+  key: (index) => [...memory.keys()][index] ?? null,
+  get length() { return memory.size; },
+};
+
+memory.set('colophon:v1:cards', JSON.stringify([{ id: 'draft-one', concept: { label: 'draft one' } }]));
+memory.set('colophon:v1:settings', JSON.stringify({ theme: 'dark' }));
+
+const migration = migrateLegacyStorage();
+check('data stored under the old name is moved', migration.moved === 2, `moved ${migration.moved}`);
+check('the new key holds the moved data', JSON.parse(memory.get('witness:v1:cards'))[0].id === 'draft-one');
+check('the old key is removed once the new one is verified', !memory.has('colophon:v1:cards'));
+check('drafts load normally after the migration', loadDraftCards()[0].id === 'draft-one');
+check('settings survive the migration', loadSettings().theme === 'dark');
+check('running it again is a no-op', migrateLegacyStorage().moved === 0);
+
+// The dangerous direction: an older value must never overwrite a newer one.
+memory.set('witness:v1:cards', JSON.stringify([{ id: 'newer' }]));
+memory.set('colophon:v1:cards', JSON.stringify([{ id: 'older' }]));
+migrateLegacyStorage();
+check('a newer value is never clobbered by an older one', JSON.parse(memory.get('witness:v1:cards'))[0].id === 'newer');
+
+const savedStorage = globalThis.localStorage;
+delete globalThis.localStorage;
+check(
+  'with storage unavailable it reports that rather than throwing',
+  migrateLegacyStorage().unavailable === true
+);
+globalThis.localStorage = savedStorage;
+
+// Nothing should have been renamed in the on-disk cards, because a card's
+// digest is what citations name.
+check(
+  'the seed cards are untouched by the rename',
+  baseDigest(cards) === 'd7d20f7e34df8dd4446c9f92bd4d21ce12ed83ec04c11525a317707c2d4eaec9',
+  baseDigest(cards)
+);
 
 // ------------------------------------------------------------------ report
 

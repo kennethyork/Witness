@@ -1,6 +1,6 @@
 {
-  "name": "Colophon — term base",
-  "short_name": "Colophon",
+  "name": "Witness — term base",
+  "short_name": "Witness",
   "description": "A cited term base for interfaith translation. Every card records how each tradition renders a concept and what each rendering loses.",
   "start_url": "./",
   "scope": "./",

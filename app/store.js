@@ -16,7 +16,10 @@
  * Writes are wrapped because localStorage throws in some privacy modes.
  */
 
-const PREFIX = 'colophon:v1:';
+const PREFIX = 'witness:v1:';
+
+/** The prefix this project used before it was renamed. */
+const LEGACY_PREFIX = 'colophon:v1:';
 
 const KEYS = {
   cards: `${PREFIX}cards`,
@@ -24,6 +27,44 @@ const KEYS = {
   settings: `${PREFIX}settings`,
   recents: `${PREFIX}recents`,
 };
+
+/**
+ * Move data stored under the old name across, once.
+ *
+ * A rename should not be a way to lose somebody's work. This runs on every load
+ * and is a no-op after the first time. Three rules:
+ *
+ *  - never overwrite a value that already exists under the new key, so a later
+ *    load cannot clobber newer data with older data;
+ *  - only delete the old copy after reading the new one back and confirming it
+ *    matches, so a failed or partial write never destroys the original;
+ *  - swallow failures, because storage can be full or disabled, and leaving the
+ *    old data in place is strictly better than losing it.
+ */
+export function migrateLegacyStorage() {
+  const storage = globalThis.localStorage;
+  if (!storage) return { moved: 0, unavailable: true };
+
+  let moved = 0;
+  for (const name of Object.keys(KEYS)) {
+    const to = KEYS[name];
+    const from = `${LEGACY_PREFIX}${name}`;
+    try {
+      if (storage.getItem(to) !== null) continue;
+      const raw = storage.getItem(from);
+      if (raw === null) continue;
+      storage.setItem(to, raw);
+      if (storage.getItem(to) === raw) {
+        storage.removeItem(from);
+        moved += 1;
+      }
+    } catch {
+      // Quota or privacy mode. The old copy stays exactly where it was.
+    }
+  }
+
+  return { moved, unavailable: false };
+}
 
 export const DEFAULT_SETTINGS = {
   theme: 'system',
@@ -136,7 +177,7 @@ export function pushRecent(id, { limit = 12 } = {}) {
 /** Everything, in one file, so a person can move devices or keep a backup. */
 export function exportEverything() {
   return {
-    format: 'colophon/local-archive',
+    format: 'witness/local-archive',
     version: 1,
     exported: new Date().toISOString(),
     drafts: loadDraftCards(),
@@ -146,7 +187,7 @@ export function exportEverything() {
 }
 
 export function importEverything(archive) {
-  if (!archive || typeof archive !== 'object') throw new Error('not a Colophon archive');
+  if (!archive || typeof archive !== 'object') throw new Error('not a Witness archive');
   if (!Array.isArray(archive.drafts) && !Array.isArray(archive.statements)) {
     throw new Error('archive has neither drafts nor statements');
   }

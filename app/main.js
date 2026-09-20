@@ -31,7 +31,7 @@ import {
   loadDraftCards, saveDraftCard, deleteDraftCard,
   loadStatements, saveStatement, deleteStatement,
   loadSettings, saveSettings, pushRecent,
-  storageAvailable, exportEverything, importEverything,
+  storageAvailable, exportEverything, importEverything, migrateLegacyStorage,
 } from './store.js';
 
 // ---------------------------------------------------------------------- state
@@ -172,7 +172,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
   view.hidden = isIndex;
 
   if (isIndex) {
-    document.title = 'Colophon — no claim without a colophon';
+    document.title = 'Witness — no claim without a witness';
     if (replacePanel || !panel) {
       if (panel) panel.node.remove();
       panel = buildSearchPanel({
@@ -197,7 +197,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     case 'term': {
       const card = state.cards.find((c) => c.id === route.id);
       if (!card) {
-        document.title = 'No such card — Colophon';
+        document.title = 'No such card — Witness';
         view.replaceChildren(messageView(
           'No such card',
           `No card in this revision of the term base has the id “${route.id}”. It may have been renamed, or the link may come from a different base revision.`,
@@ -205,7 +205,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
         ));
         break;
       }
-      document.title = `${card.concept.label} — Colophon`;
+      document.title = `${card.concept.label} — Witness`;
       pushRecent(card.id);
       view.replaceChildren(termView(card, {
         digest: state.digests.get(card.id),
@@ -216,15 +216,15 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     }
     case 'losses':
-      document.title = 'Loss ledger — Colophon';
+      document.title = 'Loss ledger — Witness';
       view.replaceChildren(lossesView(state.cards, { onExport: exportEverythingFor, actions: cardActions }));
       break;
     case 'matrix':
-      document.title = 'Concepts by language — Colophon';
+      document.title = 'Concepts by language — Witness';
       view.replaceChildren(matrixView(state.cards, cardActions));
       break;
     case 'compare':
-      document.title = 'Compare — Colophon';
+      document.title = 'Compare — Witness';
       view.replaceChildren(compareView(state.cards, {
         a: route.params.get('a') || '',
         b: route.params.get('b') || '',
@@ -240,7 +240,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }));
       break;
     case 'drafts':
-      document.title = 'Your drafts — Colophon';
+      document.title = 'Your drafts — Witness';
       view.replaceChildren(draftsView({
         drafts: [...state.drafts, ...state.statements],
         onEdit: openDraft,
@@ -252,7 +252,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     case 'author': {
       const draft = route.id ? state.drafts.find((d) => d.id === route.id) : null;
-      document.title = draft ? `Editing ${draft.concept.label || draft.id} — Colophon` : 'New card — Colophon';
+      document.title = draft ? `Editing ${draft.concept.label || draft.id} — Witness` : 'New card — Witness';
       view.replaceChildren(cardEditorView({
         draft: draft || blankCard(),
         onSave: saveCardDraft,
@@ -265,7 +265,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     }
     case 'statement': {
       const statement = route.id ? state.statements.find((s) => s.id === route.id) : null;
-      document.title = statement ? `${statement.title || statement.id} — Colophon` : 'New statement — Colophon';
+      document.title = statement ? `${statement.title || statement.id} — Witness` : 'New statement — Witness';
       view.replaceChildren(statementEditorView({
         statement: statement || blankStatement(),
         cards: state.cards,
@@ -277,14 +277,14 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       break;
     }
     case 'import':
-      document.title = 'Import — Colophon';
+      document.title = 'Import — Witness';
       view.replaceChildren(importView({
         onImportText: importText,
         onCancel: () => go('/drafts'),
       }));
       break;
     case 'settings':
-      document.title = 'Settings — Colophon';
+      document.title = 'Settings — Witness';
       view.replaceChildren(settingsView({
         settings: state.settings,
         onChange: changeSetting,
@@ -299,7 +299,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }));
       break;
     case 'about':
-      document.title = 'About — Colophon';
+      document.title = 'About — Witness';
       view.replaceChildren(aboutView({
         count: state.cards.length,
         baseRevision: state.bundle.digest,
@@ -307,7 +307,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }));
       break;
     default:
-      document.title = 'Not found — Colophon';
+      document.title = 'Not found — Witness';
       view.replaceChildren(messageView('No such page', 'That route does not exist.', { tone: 'error' }));
   }
 
@@ -356,6 +356,10 @@ function saveStatementDraft(statement) {
     return;
   }
   if (!statement.id) statement.id = statementId(statement);
+  // Normalise the record type on save. A statement written before the rename
+  // still says the old identifier; the shape is unchanged, so this is metadata
+  // catching up rather than content being rewritten.
+  statement.format = 'witness/statement';
   const result = saveStatement(statement);
   state.statements = loadStatements();
   if (!result.ok) {
@@ -396,10 +400,15 @@ function clearAllData() {
   render();
 }
 
+// Archives exported before the rename carry the old identifier, and nothing
+// about their contents changed with the name, so they still import.
+const ARCHIVE_FORMATS = ['witness/local-archive', 'colophon/local-archive'];
+
 function importText(text, kind) {
   if (!text.trim()) return { ok: false, message: 'Paste something first.' };
   try {
-    if (kind === 'archive' || (kind === 'auto' && text.includes('"format": "colophon/local-archive"'))) {
+    const isArchive = ARCHIVE_FORMATS.some((format) => text.includes(`"format": "${format}"`));
+    if (kind === 'archive' || (kind === 'auto' && isArchive)) {
       const summary = importEverything(JSON.parse(text));
       state.drafts = loadDraftCards();
       state.statements = loadStatements();
@@ -653,12 +662,19 @@ async function boot() {
     state.filters = decoded.filters;
   }
 
+  // Before anything is read: move any data stored under the project's old name
+  // across, so a rename never costs somebody their drafts.
+  const migration = migrateLegacyStorage();
+  if (migration.moved) {
+    toast(`Moved ${migration.moved} stored item${migration.moved === 1 ? '' : 's'} over after the rename. Your drafts are intact.`);
+  }
+
   view.replaceChildren(messageView('Loading', 'Reading the published cards.'));
 
   try {
     state.bundle = await loadTermBase();
   } catch (error) {
-    document.title = 'Colophon — unavailable';
+    document.title = 'Witness — unavailable';
     view.replaceChildren(messageView('The term base could not be loaded', error.message, { tone: 'error' }));
     return;
   }

@@ -59,8 +59,9 @@ tr { break-inside: avoid; }
 h3 { font-size: 12pt; margin-block-end: 3pt; }
 h2 { font-size: 15pt; }
 
-/* The colophon block must survive to paper, unclipped. */
-.colophon-block { border-block-start: 1pt solid #999; padding-block-start: 6pt; }
+/* The provenance block must survive to paper, unclipped: a citation that does
+   not travel with the page is not a citation. */
+.provenance-block { border-block-start: 1pt solid #999; padding-block-start: 6pt; }
 
 .stats { display: flex; gap: 10pt; }
 .stat-value { font-size: 13pt; }
