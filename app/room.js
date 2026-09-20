@@ -74,6 +74,13 @@ export const FORMATS = {
 
 export const FORMAT_KEYS = Object.keys(FORMATS);
 
+/** Mirrors the term states a debate record allows. */
+export const TERM_STATE_LABELS = {
+  settled: 'agreed for this debate',
+  contested: 'both sides read it differently',
+  undefined: 'nobody has pinned it down',
+};
+
 // ------------------------------------------------------------------- session
 
 export function blankSession() {
@@ -87,6 +94,14 @@ export function blankSession() {
       a: { name: 'Affirming', burden: '' },
       b: { name: 'Denying', burden: '' },
     },
+    /**
+     * Terms pinned before argument, as in a debate record.
+     *
+     * A room that skips this produces a record which says so, and that is an
+     * honest outcome -- but the whole point of the format is that the sides
+     * find out *before* arguing whether they mean the same thing by a word.
+     */
+    terms: [],
     cards: [],
     points: [],
     phaseIndex: 0,
@@ -320,7 +335,13 @@ export function sessionToDebate(session, { at = new Date().toISOString() } = {})
     motion: session?.motion || '',
     kind: 'disputation',
     created: at.slice(0, 10),
-    terms: [],
+    terms: (session?.terms || []).map((term) => ({
+      term: term.term,
+      card: term.card || '',
+      status: term.status,
+      agreed: term.agreed || '',
+      note: term.note || '',
+    })),
     sides: SIDE_KEYS.map(sideFor),
     moves,
     concessions: [],
@@ -359,13 +380,94 @@ export function motionsFor(cards, { limit = 8 } = {}) {
       if (!rendition?.loss || !rendition?.rendering) continue;
       // No language code in the prose: "into en" is a raw identifier leaking
       // into a sentence a person has to read aloud in a room.
-      motions.push(`Rendering \u201c${label}\u201d as \u201c${rendition.rendering}\u201d misleads a reader.`);
+      motions.push({
+        text: `Rendering \u201c${label}\u201d as \u201c${rendition.rendering}\u201d misleads a reader.`,
+        card: card.id,
+        term: label,
+        note: rendition.loss,
+      });
       if (motions.length >= limit) return motions;
     }
-    if (motions.length < limit) motions.push(`\u201c${label}\u201d is untranslatable.`);
+    if (motions.length < limit) {
+      motions.push({ text: `\u201c${label}\u201d is untranslatable.`, card: card.id, term: label, note: '' });
+    }
     if (motions.length >= limit) return motions;
   }
   return motions;
+}
+
+// ----------------------------------------------------------- pinned terms
+
+const isText = (value) => typeof value === 'string' && value.trim().length > 0;
+
+/**
+ * Pin a term before anybody argues about it.
+ *
+ * `contested` is the honest default: the sides disagree about the word, which is
+ * usually why there is a debate at all. A settled term needs the wording both
+ * sides accept; an unsettled one needs a note on how they read it differently,
+ * because that note is the most useful sentence the room will produce.
+ */
+export function pinTerm(session, { term = '', card = '', status = 'contested', agreed = '', note = '' } = {}) {
+  if (!isText(term)) return { ok: false, reason: 'Name the word that is in dispute.' };
+  const existing = (session.terms || []).find((entry) => entry.term === term.trim());
+  if (existing) {
+    if (card && !existing.card) existing.card = card;
+    if (note && !existing.note) existing.note = note;
+    return { ok: true, term: existing, existing: true };
+  }
+  const entry = {
+    id: `term${(session.terms || []).length + 1}`,
+    term: term.trim(),
+    card,
+    status,
+    agreed,
+    note,
+  };
+  session.terms = [...(session.terms || []), entry];
+  return { ok: true, term: entry, existing: false };
+}
+
+/**
+ * Pin the term a suggested motion is about.
+ *
+ * The card's own recorded loss is used to start the note, because that loss is
+ * exactly the substance of the dispute. It is a starting point and meant to be
+ * rewritten by the people in the room.
+ */
+export function pinFromMotion(session, motion) {
+  if (!motion?.term) return { ok: false, reason: 'That motion is not about a term in the base.' };
+  return pinTerm(session, {
+    term: motion.term,
+    card: motion.card || '',
+    status: 'contested',
+    note: motion.note ? motion.note.slice(0, 300) : '',
+  });
+}
+
+export function removeTerm(session, id) {
+  session.terms = (session.terms || []).filter((entry) => entry.id !== id);
+  return session.terms.length;
+}
+
+/**
+ * What the room should say about its pinned terms while people are arguing.
+ *
+ * Displayed during the debate rather than only at setup: a constraint nobody can
+ * see is not a constraint.
+ */
+export function pinnedTermsState(session) {
+  const terms = session?.terms || [];
+  return {
+    count: terms.length,
+    settled: terms.filter((term) => term.status === 'settled').length,
+    unpinned: terms.filter((term) => term.status !== 'settled'),
+    allSettled: terms.length > 0 && terms.every((term) => term.status === 'settled'),
+    /** Terms pinned but missing the sentence the format requires. */
+    incomplete: terms.filter((term) =>
+      term.status === 'settled' ? !isText(term.agreed) : !isText(term.note)
+    ),
+  };
 }
 
 /** The room's own transcript, for pasting into a chat or printing. */
@@ -379,6 +481,18 @@ export function sessionToMarkdown(session) {
     `- Denying: ${session.sides?.b?.name || 'b'}`,
     '',
   ];
+
+  if ((session.terms || []).length) {
+    lines.push('## Terms, pinned before argument', '');
+    for (const term of session.terms) {
+      const what = term.status === 'settled' ? term.agreed : term.note;
+      lines.push(
+        `- **${term.term}**${term.card ? ` (card \`${term.card}\`)` : ''} — ${TERM_STATE_LABELS[term.status] || term.status}`,
+        what ? `  - ${what}` : '  - _nothing recorded yet_'
+      );
+    }
+    lines.push('');
+  }
 
   for (const key of SIDE_KEYS) {
     const sideName = session.sides?.[key]?.name || key;

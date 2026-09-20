@@ -449,6 +449,23 @@ body.palette-open { overflow: hidden; }
 .room-clock.over { border-color: var(--rubric); }
 .room-clock.over .room-time { color: var(--rubric); }
 
+/* The pinned terms stay on screen while people argue: a constraint nobody can
+   see is not a constraint. */
+.room-terms { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.7rem 0.9rem; }
+.room-terms-empty { margin: 0; font-size: 0.85rem; color: var(--accent-warn); }
+.room-terms-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0 0 0.5rem; }
+.room-term-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.room-term { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; }
+.room-term-word { font-family: var(--font-text); font-size: 1.15rem; }
+.room-term-note { flex: 1 1 100%; margin: 0; font-size: 0.88rem; color: var(--ink-soft); }
+.room-term-note.empty { color: var(--ink-faint); font-style: italic; }
+.room-term-contested, .room-term-undefined { border-inline-start: 3px solid var(--accent-warn); padding-inline-start: 0.6rem; }
+
+.room-term-editor { display: grid; gap: 0.8rem; }
+.room-term-row { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.7rem 0.9rem; background: var(--paper-raised); }
+.room-term-add { display: flex; gap: 0.4rem; }
+.room-term-add input { flex: 1; }
+
 .room-columns { display: grid; gap: 1.2rem; }
 @media (min-width: 52rem) { .room-columns { grid-template-columns: 1fr 1fr; align-items: start; } }
 

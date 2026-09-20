@@ -287,6 +287,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       const roomView = debateRoomView({
         session: state.session,
         motions: motionsFor(state.cards),
+        cards: state.cards,
         onPersist: (session, message) => {
           state.session = session;
           saveSession(session);

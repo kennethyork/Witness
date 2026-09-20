@@ -31,6 +31,7 @@ import {
   phasesFor, currentPhase, formatClock, roomClock, advancePhase, lastPhase,
   pointsRemaining, canRaisePoint, raisePoint, settlePoint,
   addCard, removeCard, roomTally, sessionToDebate, sessionToMarkdown, motionsFor,
+  pinTerm, pinFromMotion, removeTerm, pinnedTermsState,
 } from '../app/room.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -939,13 +940,64 @@ check('advancePhase stops at the end', (() => {
 // source of things to argue about.
 const suggested = motionsFor(cards);
 check('motions are drawn from the cards', suggested.length > 0);
-check('a motion is a proposition, not a topic', suggested.every((motion) => motion.includes(' ') && motion.length > 20));
-check('a recorded loss becomes a motion about the rendering', suggested.some((motion) => /Rendering/.test(motion)));
-check('no raw language codes leak into a motion a person has to read aloud', !suggested.some((motion) => /\binto [a-z]{2}\b|\[(en|he|ar|grc|la)\]/.test(motion)));
-check('and each card also offers the untranslatable claim', suggested.some((motion) => /is untranslatable/.test(motion)));
+check(
+  'a motion is a proposition, not a topic',
+  suggested.every((motion) => motion.text.includes(' ') && motion.text.length > 20)
+);
+check('a recorded loss becomes a motion about the rendering', suggested.some((motion) => /Rendering/.test(motion.text)));
+check(
+  'no raw language codes leak into a motion a person has to read aloud',
+  !suggested.some((motion) => /\binto [a-z]{2}\b|\[(en|he|ar|grc|la)\]/.test(motion.text))
+);
+check('and each card also offers the untranslatable claim', suggested.some((motion) => /is untranslatable/.test(motion.text)));
+check('a motion carries the card it came from, so its term can be pinned', suggested.every((motion) => motion.card && motion.term));
 check('motions respect the limit', motionsFor(cards, { limit: 2 }).length === 2);
 check('no motions from an empty base', motionsFor([]).length === 0);
 check('a card with no label is skipped rather than crashing', motionsFor([{ renditions: [] }]).length === 0);
+
+// Pinning terms before argument. The format's signature rule, and the thing the
+// room used to let you skip.
+const termRoom = blankSession();
+termRoom.motion = 'Rendering it as that misleads a reader.';
+check('a room starts with nothing pinned', pinnedTermsState(termRoom).count === 0);
+check('a blank pin is refused', !pinTerm(termRoom, { term: '   ' }).ok);
+const pinned = pinTerm(termRoom, { term: 'hesed', card: 'hesed', status: 'contested' });
+check('pinning records the word and the card it belongs to', pinned.ok && termRoom.terms[0].card === 'hesed');
+check('a contested term with no description is reported incomplete', pinnedTermsState(termRoom).incomplete.length === 1);
+pinTerm(termRoom, { term: 'hesed', note: 'pro: covenant loyalty. con: mercy.' });
+check('pinning the same word twice does not duplicate it', termRoom.terms.length === 1);
+check('and it fills in what was missing', pinnedTermsState(termRoom).incomplete.length === 0);
+check('a room where nothing is settled is not reported as agreeing', pinnedTermsState(termRoom).allSettled === false);
+termRoom.terms[0].status = 'settled';
+termRoom.terms[0].agreed = 'the covenant loyalty of God, for this debate';
+check('a settled term with wording is complete', pinnedTermsState(termRoom).incomplete.length === 0);
+check('and the room reports agreement on the words', pinnedTermsState(termRoom).allSettled === true);
+termRoom.terms[0].agreed = '';
+check('a settled term with no wording is incomplete again', pinnedTermsState(termRoom).incomplete.length === 1);
+
+check('pinned terms carry into the record', sessionToDebate(termRoom).terms[0].term === 'hesed');
+check('and the record no longer warns about unpinned terms',
+  !debateWarnings(sessionToDebate(termRoom)).some((finding) => finding.path === 'terms'));
+check('a room with nothing pinned does produce that warning',
+  debateWarnings(sessionToDebate(blankSession())).some((finding) => finding.path === 'terms'));
+
+const fromMotion = blankSession();
+pinFromMotion(fromMotion, suggested[0]);
+check('taking a motion from the base pins its term', fromMotion.terms.length === 1);
+check('and seeds the description from the card\u2019s recorded loss', fromMotion.terms[0].note.length > 0);
+check('a motion with no term behind it is refused', !pinFromMotion(blankSession(), { text: 'a topic' }).ok);
+
+check('a term can be removed', removeTerm(termRoom, termRoom.terms[0].id) === 0);
+const transcriptWithTerms = sessionToMarkdown((() => {
+  const room = blankSession();
+  room.motion = 'A motion.';
+  room.sides.a.burden = 'x';
+  room.sides.b.burden = 'y';
+  pinTerm(room, { term: 'hesed', status: 'contested', note: 'two readings' });
+  return room;
+})());
+check('the session transcript prints the pinned terms', transcriptWithTerms.includes('Terms, pinned before argument'));
+check('and prints how the sides read them', transcriptWithTerms.includes('two readings'));
 
 
 

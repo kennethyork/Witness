@@ -12,17 +12,20 @@
  */
 
 import { el, block, clear } from './dom.js';
-import { field, textInput } from './forms.js';
+import { field, textInput, textArea, select } from './forms.js';
 import { button } from './ui.js';
 import {
-  FORMATS, FORMAT_KEYS, SIDE_KEYS, blankSession, suggestBurden,
+  FORMATS, FORMAT_KEYS, TERM_STATE_LABELS, SIDE_KEYS, suggestBurden,
   roomClock, advancePhase, lastPhase,
   canRaisePoint, raisePoint, settlePoint, addCard, removeCard, roomTally,
+  pinTerm, pinFromMotion, removeTerm, pinnedTermsState,
   sessionToMarkdown,
 } from './room.js';
 
+const TERM_STATES = ['settled', 'contested', 'undefined'];
+
 export function debateRoomView({
-  session, motions = [], onPersist, onProduce, onReset,
+  session, motions = [], cards = [], onPersist, onProduce, onReset,
 }) {
   const node = el('div', { class: 'room' });
   let interval = null;
@@ -38,7 +41,52 @@ export function debateRoomView({
 
   const clockNode = el('div', { class: 'room-clock' });
   const phaseNode = el('div', { class: 'room-phase' });
+  const termsStrip = el('div', { class: 'room-terms' });
   const columnsNode = el('div', { class: 'room-columns' });
+
+  /**
+   * The pinned terms, kept in view while people argue.
+   *
+   * This is the format's signature rule, and a constraint nobody can see is not
+   * a constraint. A contested term shows how each side reads it, so a speaker
+   * can be reminded mid-argument that the disagreement may be about the word.
+   */
+  function drawTermsStrip() {
+    const state = pinnedTermsState(session);
+    clear(termsStrip);
+
+    if (!state.count) {
+      termsStrip.append(el('p', {
+        class: 'room-terms-empty',
+        text: 'No terms pinned. The record will say so, and some of this may be a disagreement about a word.',
+      }));
+      return;
+    }
+
+    termsStrip.append(
+      el('p', { class: 'room-terms-head' },
+        el('span', { class: 'lang', text: `${state.count} term(s) pinned` }),
+        state.allSettled
+          ? el('span', { class: 'status status-ok', text: 'both sides agree on the words' })
+          : el('span', { class: 'status status-warn', text: `${state.unpinned.length} read differently` }),
+        state.incomplete.length
+          ? el('span', { class: 'status status-alert', text: `${state.incomplete.length} still to describe` })
+          : null
+      ),
+      el('ul', { class: 'room-term-list' }, (session.terms || []).map((term) =>
+        el('li', { class: `room-term room-term-${term.status}` },
+          el('span', { class: 'room-term-word', auto: term.term }),
+          term.card
+            ? el('a', { class: 'lang', href: `#/term/${encodeURIComponent(term.card)}`, text: term.card })
+            : null,
+          el('span', { class: 'lang', text: TERM_STATE_LABELS[term.status] || term.status }),
+          (term.status === 'settled' ? term.agreed : term.note)
+            ? block('p', term.status === 'settled' ? term.agreed : term.note, { class: 'room-term-note' })
+            : el('p', { class: 'room-term-note empty', text: 'nothing recorded yet' })
+        )
+      ))
+    );
+  }
 
   // ------------------------------------------------------------- the clock
 
@@ -232,7 +280,80 @@ export function debateRoomView({
         if (!burdens[key].value.trim()) burdens[key].value = suggestBurden(motion.value, key);
       }
     };
-    motion.addEventListener('blur', fillBurdens);
+    // Keep the typed motion in the session without redrawing, so choosing a
+    // suggestion afterwards does not lose what somebody already wrote.
+    motion.addEventListener('blur', () => {
+      session.motion = motion.value;
+      fillBurdens();
+      persist();
+    });
+
+    // ---------------------------------------------------------- the terms
+
+    const termsNode = el('div', { class: 'room-term-editor' });
+
+    const drawTerms = () => {
+      const state = pinnedTermsState(session);
+      const newTerm = el('input', {
+        type: 'text', dir: 'auto', placeholder: 'a word the two sides may mean differently…',
+        autocomplete: 'off',
+      });
+
+      clear(termsNode).append(
+        (session.terms || []).map((term, index) => el('div', { class: 'room-term-row' },
+          el('div', { class: 'repeatable-head' },
+            el('span', { class: 'repeatable-title', text: `Term ${index + 1}` }),
+            button('Remove', () => { removeTerm(session, term.id); persist(); drawTerms(); }, { class: 'ghost tiny' })
+          ),
+          el('div', { class: 'form-row' },
+            field('Word', el('input', {
+              type: 'text', dir: 'auto', value: term.term, autocomplete: 'off',
+              on: { input: (event) => { term.term = event.target.value; persist(); } },
+            }), { hint: 'In the language it is disputed in.' }),
+            field('Term card', el('input', {
+              type: 'text', list: 'room-term-cards', value: term.card || '', autocomplete: 'off',
+              on: { input: (event) => { term.card = event.target.value.trim(); persist(); } },
+            }), { hint: 'Optional. Bind it and the card\u2019s recorded losses come with it.' })
+          ),
+          field('Status', select({
+            value: term.status,
+            options: TERM_STATES.map((value) => [value, TERM_STATE_LABELS[value]]),
+            onChange: (value) => { term.status = value; persist(); drawTerms(); },
+          }), {}),
+          field(term.status === 'settled'
+            ? 'What both sides accept it to mean here'
+            : 'How the sides read it differently', textArea({
+              value: term.status === 'settled' ? term.agreed : term.note,
+              rows: 2, dir: 'auto',
+              onChange: (value) => {
+                if (term.status === 'settled') term.agreed = value;
+                else term.note = value;
+                persist();
+              },
+            }), {
+            hint: term.status === 'settled'
+              ? 'Required. The wording both sides will accept for this debate.'
+              : 'Required, and usually the most useful sentence the room produces. If the sides cannot write it, that is worth knowing before anyone argues.',
+          })
+        )),
+
+        el('div', { class: 'room-term-add' },
+          newTerm,
+          button('Pin it', () => {
+            const result = pinTerm(session, { term: newTerm.value, status: 'contested' });
+            if (!result.ok) { newTerm.focus(); return; }
+            newTerm.value = '';
+            persist();
+            drawTerms();
+          }, { class: 'tiny' })
+        ),
+
+        state.incomplete.length
+          ? el('p', { class: 'field-error', text: `${state.incomplete.length} term(s) still need the sentence the record requires.` })
+          : null
+      );
+    };
+    drawTerms();
 
     const open = () => {
       if (!motion.value.trim()) {
@@ -267,12 +388,18 @@ export function debateRoomView({
             el('ul', {}, motions.map((suggestion) =>
               el('li', {},
                 el('button', {
-                  type: 'button', class: 'ghost tiny', text: suggestion,
+                  type: 'button', class: 'ghost tiny', text: suggestion.text,
                   on: {
                     click: () => {
-                      motion.value = suggestion;
-                      fillBurdens();
-                      motion.focus();
+                      // Taking a motion from the base also pins its term, seeded
+                      // from that card's recorded loss: the loss is the dispute.
+                      session.motion = suggestion.text;
+                      for (const key of SIDE_KEYS) {
+                        session.sides[key].burden = suggestBurden(suggestion.text, key);
+                      }
+                      pinFromMotion(session, suggestion);
+                      persist();
+                      draw();
                     },
                   },
                 })
@@ -280,6 +407,14 @@ export function debateRoomView({
             ))
           )
         : null,
+
+      el('datalist', { id: 'room-term-cards' }, cards.map((card) => el('option', { value: card.id, text: card.concept.label }))),
+
+      el('fieldset', { class: 'group' },
+        el('legend', { text: 'Terms, pinned before argument' }),
+        el('p', { class: 'hint', text: 'Most disagreement about a word is disagreement about the word. Pin it now, or find out here that you cannot \u2014 either is better than discovering it an hour in.' }),
+        termsNode
+      ),
 
       el('fieldset', { class: 'group' },
         el('legend', { text: 'Format' }),
@@ -380,6 +515,7 @@ export function debateRoomView({
       node.append(setupScreen());
       return;
     }
+    drawTermsStrip();
     node.append(
       el('div', { class: 'room-head' },
         block('p', session.motion, { class: 'room-motion', tabindex: '-1' }),
@@ -407,6 +543,7 @@ export function debateRoomView({
       ),
       phaseNode,
       clockNode,
+      termsStrip,
       columnsNode,
       judgementPanel()
     );
@@ -423,5 +560,3 @@ export function debateRoomView({
     },
   };
 }
-
-export { blankSession };
