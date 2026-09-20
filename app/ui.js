@@ -378,7 +378,7 @@ export function lossesView(cards, { onExport, actions }) {
   );
 }
 
-function stat(value, label) {
+export function stat(value, label) {
   return el('li', { class: 'stat' },
     el('span', { class: 'stat-value', text: value }),
     el('span', { class: 'stat-label', text: label })

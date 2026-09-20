@@ -26,11 +26,13 @@ import {
   buildSearchPanel, cardListItem, termView, lossesView, matrixView, compareView,
   aboutView, messageView,
 } from './ui.js';
-import { cardEditorView, draftsView, statementEditorView, settingsView, importView } from './editor.js';
+import { cardEditorView, draftsView, statementEditorView, debateEditorView, settingsView, importView } from './editor.js';
+import { blankDebate, debateSlug, lintDebate, debateToMarkdown } from './debate.js';
 import {
   loadDraftCards, saveDraftCard, deleteDraftCard,
   loadStatements, saveStatement, deleteStatement,
   loadSettings, saveSettings, pushRecent,
+  loadDebates, saveDebate, deleteDebate,
   storageAvailable, exportEverything, importEverything, migrateLegacyStorage,
 } from './store.js';
 
@@ -47,6 +49,7 @@ const state = {
   route: { name: 'index', params: new URLSearchParams() },
   drafts: [],
   statements: [],
+  debates: [],
   settings: loadSettings(),
   storageOk: storageAvailable(),
   results: [],
@@ -63,7 +66,7 @@ main.append(browse, view, toastNode);
 
 // -------------------------------------------------------------------- routing
 
-const ROUTES = ['term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'import', 'settings', 'about'];
+const ROUTES = ['term', 'losses', 'matrix', 'compare', 'drafts', 'author', 'statement', 'debate', 'import', 'settings', 'about'];
 
 function parseRoute() {
   const raw = location.hash.replace(/^#/, '') || '/';
@@ -294,11 +297,13 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
     case 'drafts':
       document.title = 'Your drafts — Witness';
       view.replaceChildren(draftsView({
-        drafts: [...state.drafts, ...state.statements],
+        cards: state.drafts,
+        statements: state.statements,
+        debates: state.debates,
         onEdit: openDraft,
         onDelete: removeDraft,
         onExport: exportEverythingFor,
-        onCreate: (kind) => go(kind === 'statement' ? '/statement' : '/author'),
+        onCreate: (kind) => go(kind === 'debate' ? '/debate' : kind === 'statement' ? '/statement' : '/author'),
         onImport: () => go('/import'),
       }));
       break;
@@ -328,6 +333,19 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
       }).node);
       break;
     }
+    case 'debate': {
+      const debate = route.id ? state.debates.find((d) => d.id === route.id) : null;
+      document.title = debate ? `${debate.motion || debate.id} — Witness` : 'New debate — Witness';
+      view.replaceChildren(debateEditorView({
+        debate: debate || blankDebate(),
+        cards: state.cards,
+        onSave: saveDebateDraft,
+        onExport: exportEverythingFor,
+        onDelete: (id) => { removeDraft(id); go('/drafts'); },
+        onReset: () => go('/debate'),
+      }).node);
+      break;
+    }
     case 'import':
       document.title = 'Import — Witness';
       view.replaceChildren(importView({
@@ -347,7 +365,7 @@ function render({ moveFocus = false, replacePanel = false } = {}) {
         onImportArchive: () => go('/import'),
         onClearAll: clearAllData,
         storageOk: state.storageOk,
-        counts: { cards: state.drafts.length, statements: state.statements.length },
+        counts: { cards: state.drafts.length, statements: state.statements.length, debates: state.debates.length },
       }));
       break;
     case 'about':
@@ -421,8 +439,40 @@ function saveStatementDraft(statement) {
   toast('Saved on this device. Nothing was uploaded.');
 }
 
+function saveDebateDraft(debate) {
+  if (!debate.motion) {
+    toast('A debate needs a motion: one sentence that could be affirmed or denied.', { tone: 'warn' });
+    return;
+  }
+  if (!debate.id) debate.id = debateSlug(debate);
+  debate.format = 'witness/debate';
+  const result = saveDebate(debate);
+  state.debates = loadDebates();
+  if (!result.ok) {
+    toast(result.error, { sticky: true, tone: 'error' });
+    return;
+  }
+
+  // Errors are about the record's shape; warnings are about argument hygiene.
+  // They are reported differently because one blocks a readable record and the
+  // other is just worth knowing.
+  const findings = lintDebate(debate);
+  const errors = findings.filter((f) => f.level === 'error').length;
+  const warnings = findings.filter((f) => f.level === 'warn').length;
+  if (errors) {
+    toast(`Saved with ${errors} problem${errors === 1 ? '' : 's'} in the record still to fix.`, { tone: 'warn' });
+  } else if (warnings) {
+    toast(`Saved. ${warnings} thing${warnings === 1 ? '' : 's'} worth a look, listed under the form.`);
+  } else {
+    toast('Saved on this device. Nothing was uploaded.');
+  }
+}
+
 function openDraft(draft) {
-  if (draft.versions) {
+  if (draft.moves) {
+    state.debates = loadDebates();
+    go(`/debate/${encodeURIComponent(draft.id)}`);
+  } else if (draft.versions) {
     state.statements = loadStatements();
     go(`/statement/${encodeURIComponent(draft.id)}`);
   } else {
@@ -432,22 +482,26 @@ function openDraft(draft) {
 }
 
 function removeDraft(id) {
-  if (state.statements.some((s) => s.id === id)) deleteStatement(id);
+  if (state.debates.some((d) => d.id === id)) deleteDebate(id);
+  else if (state.statements.some((s) => s.id === id)) deleteStatement(id);
   else deleteDraftCard(id);
   state.drafts = loadDraftCards();
   state.statements = loadStatements();
+  state.debates = loadDebates();
   toast('Deleted from this device.');
 }
 
 function clearAllData() {
   const confirmed = globalThis.confirm?.(
-    'Delete every draft and statement stored in this browser? This cannot be undone. Export first if you are not sure.'
+    'Delete every draft, statement, and debate stored in this browser? This cannot be undone. Export first if you are not sure.'
   );
   if (!confirmed) return;
   for (const draft of loadDraftCards()) deleteDraftCard(draft.id);
   for (const statement of loadStatements()) deleteStatement(statement.id);
+  for (const debate of loadDebates()) deleteDebate(debate.id);
   state.drafts = [];
   state.statements = [];
+  state.debates = [];
   toast('All local data deleted.');
   render();
 }
@@ -464,7 +518,20 @@ function importText(text, kind) {
       const summary = importEverything(JSON.parse(text));
       state.drafts = loadDraftCards();
       state.statements = loadStatements();
-      return { ok: true, message: `Imported ${summary.drafts} draft card(s) and ${summary.statements} statement(s).` };
+      state.debates = loadDebates();
+      return {
+        ok: true,
+        message: `Imported ${summary.drafts} card(s), ${summary.statements} statement(s), ${summary.debates} debate(s).`,
+      };
+    }
+    if (kind === 'debate' || (kind === 'auto' && text.includes('"motion"') && text.includes('"moves"'))) {
+      const debate = JSON.parse(text);
+      if (!Array.isArray(debate.moves)) throw new Error('expected a debate record with a "moves" array');
+      if (!debate.id) debate.id = debateSlug(debate);
+      debate.format = 'witness/debate';
+      saveDebate(debate);
+      state.debates = loadDebates();
+      return { ok: true, message: `Imported the debate “${debate.motion || debate.id}”.` };
     }
     if (kind === 'statement' || (kind === 'auto' && text.includes('"versions"'))) {
       const statement = parseStatementInput(text);
@@ -530,6 +597,14 @@ function exportEverythingFor(kind, payload) {
     case 'statement-markdown':
       download(filename('statement', payload.id || payload.title, 'md'), statementToMarkdown(payload), 'text/markdown');
       toast('Markdown downloaded. This is the version to circulate.');
+      return;
+    case 'debate':
+      download(filename('debate', payload.id || payload.motion, 'json'), `${JSON.stringify(payload, null, 2)}\n`);
+      toast('Debate record downloaded. The JSON is the record of what each side actually said.');
+      return;
+    case 'debate-markdown':
+      download(filename('debate', payload.id || payload.motion, 'md'), debateToMarkdown(payload), 'text/markdown');
+      toast('Markdown downloaded. This is the version to circulate, including the objections nobody answered.');
       return;
     case 'statement-cite':
       return copyAndSay(citeStatement(payload, { url: permalink(`/statement/${payload.id}`) }), 'Statement citation copied.');
@@ -608,6 +683,7 @@ function buildPalette() {
     { label: 'Your drafts', route: '/drafts' },
     { label: 'New term card', route: '/author' },
     { label: 'New statement', route: '/statement' },
+    { label: 'New debate', route: '/debate' },
     { label: 'Import JSON', route: '/import' },
     { label: 'Settings', route: '/settings' },
     { label: 'About', route: '/about' },
@@ -738,6 +814,7 @@ async function boot() {
 
   state.drafts = loadDraftCards();
   state.statements = loadStatements();
+  state.debates = loadDebates();
 
   palette = buildPalette();
   document.body.append(palette.node);

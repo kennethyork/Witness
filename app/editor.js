@@ -21,8 +21,13 @@ import {
   STATEMENT_KINDS, PARTY_ROLES, statementState, outstanding, lengthSignals,
   citedTerms, lintStatement,
 } from './parity.js';
+import {
+  MOVE_KINDS, MOVE_KIND_LABELS, SIDE_POSITIONS, TERM_STATES, TERM_STATE_LABELS,
+  CONCESSION_STATES, CONCESSION_LABELS, ADJUDICATION_STATES, DEBATE_KINDS,
+  debateState, debateSlug, nextMoveId, lintDebate,
+} from './debate.js';
 import { STATUS_LABELS } from './search.js';
-import { button, sectionHeading } from './ui.js';
+import { button, sectionHeading, stat } from './ui.js';
 
 const LANGUAGES = [
   'ar', 'bo', 'cop', 'de', 'en', 'es', 'fa', 'fr', 'grc', 'he', 'hi', 'hy', 'id',
@@ -487,10 +492,7 @@ export function cardEditorView({ draft, onSave, onExport, onDelete, onReset, onI
 
 // ---------------------------------------------------------------- drafts
 
-export function draftsView({ drafts, onEdit, onDelete, onExport, onCreate, onImport }) {
-  const cards = drafts.filter((d) => !d.format || d.format === 'witness/card' || d.concept);
-  const statements = drafts.filter((d) => d.format === 'witness/statement' || d.versions);
-
+export function draftsView({ cards = [], statements = [], debates = [], onEdit, onDelete, onExport, onCreate, onImport }) {
   const list = (items, render) => items.length
     ? el('ul', { class: 'draft-list' }, items.map(render))
     : el('p', { class: 'empty', text: 'Nothing here yet.' });
@@ -503,6 +505,7 @@ export function draftsView({ drafts, onEdit, onDelete, onExport, onCreate, onImp
     el('div', { class: 'actions' },
       button('New card', onCreate),
       button('New statement', () => onCreate('statement'), { class: 'ghost' }),
+      button('New debate', () => onCreate('debate'), { class: 'ghost' }),
       button('Import JSON', () => onImport(), { class: 'ghost' }),
       button('Export everything', () => onExport('archive'), { class: 'ghost' })
     ),
@@ -523,6 +526,33 @@ export function draftsView({ drafts, onEdit, onDelete, onExport, onCreate, onImp
           button('Edit', () => onEdit(draft)),
           button('Export JSON', () => onExport('card', draft), { class: 'ghost' }),
           button('Delete', () => onDelete(draft.id), { class: 'ghost danger' })
+        )
+      );
+    }),
+
+    sectionHeading('Debates', { note: 'Structured disputation: a motion, terms pinned before argument, burdens, and objections that must restate what they attack.' }),
+    list(debates, (debate) => {
+      const state = debateState(debate);
+      const unpinned = state.unpinnedTerms.length;
+      return el('li', { class: 'draft-item' },
+        el('div', {},
+          block('span', debate.motion || debate.id || 'untitled motion', { class: 'card-title' }),
+          el('span', { class: 'lang', text: `${state.moves} move(s)` }),
+          state.decided
+            ? el('span', { class: 'status status-ok', text: 'decided' })
+            : el('span', { class: 'status status-warn', text: 'open' }),
+          state.unanswered.length
+            ? el('span', { class: 'status status-alert', text: `${state.unanswered.length} objection(s) unanswered` })
+            : null,
+          unpinned
+            ? el('span', { class: 'status status-warn', text: `${unpinned} term(s) unpinned` })
+            : null
+        ),
+        el('div', { class: 'actions' },
+          button('Edit', () => onEdit(debate)),
+          button('Export JSON', () => onExport('debate', debate), { class: 'ghost' }),
+          button('Export Markdown', () => onExport('debate-markdown', debate), { class: 'ghost' }),
+          button('Delete', () => onDelete(debate.id), { class: 'ghost danger' })
         )
       );
     }),
@@ -937,6 +967,505 @@ function parityPanel(statement, cards) {
   );
 }
 
+// ----------------------------------------------------------- debate editor
+
+/**
+ * The debate editor.
+ *
+ * Same shape as the statement editor, and the same rule: it records what people
+ * declared and computes facts about the record. It has no opinion on who argued
+ * better, and there is nowhere in this view to express one.
+ */
+export function debateEditorView({ debate, cards, onSave, onExport, onDelete, onReset }) {
+  const findingsNode = el('div', { class: 'editor-findings' });
+  const stateNode = el('div', { class: 'debate-panel' });
+  let timer = null;
+
+  const refresh = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      findingsNode.replaceChildren(findingsPanel(lintDebate(debate), { title: 'Problems in the record' }));
+      stateNode.replaceChildren(debatePanel(debate, cards));
+    }, 120);
+  };
+  const touch = () => refresh();
+
+  const termsNode = el('div', { class: 'repeatable-host' });
+  const sidesNode = el('div', { class: 'repeatable-host' });
+  const movesNode = el('div', { class: 'repeatable-host' });
+  const concessionsNode = el('div', { class: 'repeatable-host' });
+
+  // ------------------------------------------------------------------ terms
+
+  const renderTerms = () => {
+    const list = repeatable({
+      items: (debate.terms = debate.terms || []),
+      addLabel: 'Add a contested term',
+      emptyLabel: 'No terms pinned. Most interfaith disagreement is disagreement about a word, so this is usually worth doing first.',
+      onAdd: () => debate.terms.push({ term: '', card: '', status: 'contested', agreed: '', note: '' }),
+      renderItem: (term, index, remove) =>
+        el('div', { class: 'repeatable-item' },
+          el('div', { class: 'repeatable-head' },
+            el('span', { class: 'repeatable-title', text: `Term ${index + 1}${term.term ? ` — ${term.term}` : ''}` }),
+            button('Remove', remove, { class: 'ghost tiny' })
+          ),
+          el('div', { class: 'form-row' },
+            field('Word', el('input', {
+              id: `term-${index}-term`, type: 'text', dir: 'auto', value: term.term || '', autocomplete: 'off',
+              on: { input: (event) => { term.term = event.target.value; touch(); } },
+            }), { id: `term-${index}-term`, hint: 'In the language it is disputed in.' }),
+            field('Term card', el('input', {
+              id: `term-${index}-card`, type: 'text', list: 'term-card-ids', value: term.card || '', autocomplete: 'off',
+              on: { input: (event) => { term.card = event.target.value.trim(); touch(); } },
+            }), { id: `term-${index}-card`, hint: 'Optional. Bind the term to a card and its recorded losses come with it.' })
+          ),
+          field('Status', select({
+            id: `term-${index}-status`,
+            value: term.status,
+            options: TERM_STATES.map((state) => [state, TERM_STATE_LABELS[state]]),
+            onChange: (value) => { term.status = value; renderTerms(); },
+          }), { id: `term-${index}-status` }),
+          term.status === 'settled'
+            ? field('What both sides accept it to mean here', textArea({
+                id: `term-${index}-agreed`, value: term.agreed || '', rows: 2, dir: 'auto',
+                onChange: (value) => { term.agreed = value; touch(); },
+              }), { id: `term-${index}-agreed` })
+            : field('How the sides read it differently', textArea({
+                id: `term-${index}-note`, value: term.note || '', rows: 3, dir: 'auto',
+                onChange: (value) => { term.note = value; touch(); },
+              }), { id: `term-${index}-note`, hint: 'Usually the most useful line in the debate. If the sides cannot pin the word, say so and consider arguing about that instead.' })
+        ),
+    });
+    clear(termsNode).append(list.node);
+  };
+
+  // ------------------------------------------------------------------ sides
+
+  const renderSides = () => {
+    const list = repeatable({
+      items: (debate.sides = debate.sides || []),
+      addLabel: 'Add a side',
+      emptyLabel: 'A debate needs at least two sides.',
+      onAdd: () => debate.sides.push({ id: `side-${debate.sides.length + 1}`, name: '', position: 'undecided', burden: '', languages: [] }),
+      onRemove: () => { renderSides(); renderMoves(); },
+      renderItem: (side, index, remove) =>
+        el('div', { class: 'repeatable-item' },
+          el('div', { class: 'repeatable-head' },
+            el('span', { class: 'repeatable-title', text: `Side ${index + 1}` }),
+            button('Remove', remove, { class: 'ghost tiny' })
+          ),
+          el('div', { class: 'form-row' },
+            field('Name', textInput({
+              id: `side-${index}-name`, value: side.name,
+              onChange: (value) => { side.name = value; touch(); },
+            }), { id: `side-${index}-name`, hint: 'The person, or the community they speak for.' }),
+            field('Position', select({
+              id: `side-${index}-position`, value: side.position,
+              options: SIDE_POSITIONS.map((position) => [position, position]),
+              onChange: (value) => { side.position = value; touch(); },
+            }), { id: `side-${index}-position` })
+          ),
+          el('div', { class: 'form-row' },
+            field('Id', textInput({
+              id: `side-${index}-id`, value: side.id,
+              onChange: (value) => { side.id = debateSlug({ motion: value }) || value; touch(); },
+            }), { id: `side-${index}-id`, hint: 'Short key that moves refer to. Renaming it after moves exist breaks them.' }),
+            field('Languages', textInput({
+              id: `side-${index}-languages`, value: (side.languages || []).join(', '), placeholder: 'en, ar',
+              onChange: (value) => { side.languages = value.split(',').map((code) => code.trim()).filter(Boolean); touch(); },
+            }), { id: `side-${index}-languages` })
+          ),
+          field('What this side has to establish', textArea({
+            id: `side-${index}-burden`, value: side.burden, rows: 2,
+            onChange: (value) => { side.burden = value; touch(); },
+          }), { id: `side-${index}-burden`, hint: 'Required. This is the sentence that makes the exchange a debate rather than two statements.' })
+        ),
+    });
+    clear(sidesNode).append(list.node);
+  };
+
+  // ------------------------------------------------------------------ moves
+
+  const evidenceFor = (move, index) => repeatable({
+    items: (move.evidence = move.evidence || []),
+    addLabel: 'Add evidence',
+    emptyLabel: 'No evidence. An argument that cites nothing is flagged, not blocked: sometimes you reason from a text you have not quoted yet.',
+    onAdd: () => move.evidence.push({ source: '', locator: '', card: '' }),
+    renderItem: (item, eIndex, removeEvidence) =>
+      el('div', { class: 'repeatable-item nested' },
+        el('div', { class: 'repeatable-head' },
+          el('span', { class: 'repeatable-title', text: `Evidence ${eIndex + 1}` }),
+          button('Remove', removeEvidence, { class: 'ghost tiny' })
+        ),
+        field('Source', textInput({
+          id: `move-${index}-evidence-${eIndex}-source`, value: item.source,
+          onChange: (value) => { item.source = value; touch(); },
+        }), { id: `move-${index}-evidence-${eIndex}-source` }),
+        el('div', { class: 'form-row' },
+          field('Locator', textInput({
+            id: `move-${index}-evidence-${eIndex}-locator`, value: item.locator || '',
+            onChange: (value) => { item.locator = value; touch(); },
+          }), { id: `move-${index}-evidence-${eIndex}-locator` }),
+          field('Term card', el('input', {
+            id: `move-${index}-evidence-${eIndex}-card`, type: 'text', list: 'term-card-ids',
+            value: item.card || '', autocomplete: 'off',
+            on: { input: (event) => { item.card = event.target.value.trim(); touch(); } },
+          }), { id: `move-${index}-evidence-${eIndex}-card` })
+        )
+      ),
+  });
+
+  const renderMoves = () => {
+    const list = repeatable({
+      items: (debate.moves = debate.moves || []),
+      addLabel: 'Add a move',
+      emptyLabel: 'No moves yet. Openings state the case; arguments carry evidence and a warrant; objections must restate what they attack.',
+      onAdd: () => debate.moves.push({
+        id: nextMoveId(debate), kind: 'argument', side: debate.sides?.[0]?.id || 'pro',
+        language: '', claim: '', warrant: '', impact: '', steelman: '', targets: [], evidence: [],
+      }),
+      onRemove: () => renderMoves(),
+      renderItem: (move, index, remove) => {
+        const others = debate.moves.filter((other) => other.id !== move.id);
+        move.targets = move.targets || [];
+
+        const targetList = others.length
+          ? el('ul', { class: 'target-list' }, others.map((other) => {
+              const otherIndex = debate.moves.indexOf(other) + 1;
+              const checked = move.targets.includes(other.id);
+              return el('li', {},
+                el('label', { class: 'facet' },
+                  el('input', {
+                    type: 'checkbox',
+                    checked,
+                    on: {
+                      change: (event) => {
+                        if (event.target.checked) move.targets.push(other.id);
+                        else move.targets = move.targets.filter((id) => id !== other.id);
+                        touch();
+                      },
+                    },
+                  }),
+                  el('span', { text: `${otherIndex}. ${MOVE_KIND_LABELS[other.kind] || other.kind}${other.claim ? ` — ${other.claim.slice(0, 50)}` : ''}` })
+                )
+              );
+            }))
+          : el('p', { class: 'empty', text: 'No other moves to answer yet.' });
+
+        return el('div', { class: 'repeatable-item version' },
+          el('div', { class: 'repeatable-head' },
+            el('span', { class: 'repeatable-title', text: `Move ${index + 1} — ${move.id}` }),
+            button('Remove', remove, { class: 'ghost tiny' })
+          ),
+          el('div', { class: 'form-row' },
+            field('Kind', select({
+              id: `move-${index}-kind`, value: move.kind,
+              options: MOVE_KINDS.map((kind) => [kind, MOVE_KIND_LABELS[kind]]),
+              onChange: (value) => { move.kind = value; renderMoves(); },
+            }), { id: `move-${index}-kind` }),
+            field('Side', select({
+              id: `move-${index}-side`, value: move.side,
+              options: (debate.sides || []).map((side) => [side.id, side.name || side.id]),
+              onChange: (value) => { move.side = value; touch(); },
+            }), { id: `move-${index}-side` })
+          ),
+          field('The claim', textArea({
+            id: `move-${index}-claim`, value: move.claim || '', rows: 2, dir: 'auto',
+            onChange: (value) => { move.claim = value; touch(); },
+          }), { id: `move-${index}-claim` }),
+          field('Evidence', el('div', {}, evidenceFor(move, index).node), {
+            id: `move-${index}-evidence`,
+            hint: 'A citation, ideally a term card. Evidence is not proof; it is something the other side can check.',
+          }),
+          field(move.kind === 'objection' ? 'Restate the move it attacks, at its strongest — required' : 'Restate the move it attacks, at its strongest',
+            textArea({
+              id: `move-${index}-steelman`, value: move.steelman || '', rows: 3, dir: 'auto',
+              onChange: (value) => { move.steelman = value; touch(); },
+            }),
+            {
+              id: `move-${index}-steelman`,
+              className: move.kind === 'objection' && (move.steelman || '').trim().length < 40 ? 'field-attention' : '',
+              hint: 'Before answering, put the other side\u2019s argument as they would put it. This is the rule that stops two speeches happening instead of a debate.',
+            }
+          ),
+          field('Which moves this answers', el('div', {}, targetList), {
+            id: `move-${index}-targets`,
+            hint: move.kind === 'objection' || move.kind === 'response'
+              ? 'Required for objections and responses.'
+              : 'Optional elsewhere.',
+          }),
+          field('Warrant — why the evidence supports the claim', textArea({
+            id: `move-${index}-warrant`, value: move.warrant || '', rows: 2, dir: 'auto',
+            onChange: (value) => { move.warrant = value; touch(); },
+          }), { id: `move-${index}-warrant`, hint: 'Without this the citation is decoration.' }),
+          field('Why it matters', textArea({
+            id: `move-${index}-impact`, value: move.impact || '', rows: 2, dir: 'auto',
+            onChange: (value) => { move.impact = value; touch(); },
+          }), { id: `move-${index}-impact` }),
+          field('Language the move was made in', el('input', {
+            id: `move-${index}-language`, type: 'text', list: 'lang-codes', value: move.language || '',
+            autocomplete: 'off',
+            on: { input: (event) => { move.language = event.target.value.trim(); touch(); } },
+          }), { id: `move-${index}-language`, hint: 'Recorded, because a debate held in two languages has two records.' })
+        );
+      },
+    });
+    clear(movesNode).append(list.node);
+  };
+
+  // ------------------------------------------------------------ concessions
+
+  const renderConcessions = () => {
+    const list = repeatable({
+      items: (debate.concessions = debate.concessions || []),
+      addLabel: 'Record where a move stands',
+      emptyLabel: 'Nothing recorded. Concessions are what a debate actually turns on, and they are usually unrecorded.',
+      onAdd: () => debate.concessions.push({ move: debate.moves?.[0]?.id || '', side: debate.sides?.[0]?.id || '', state: 'contested', note: '' }),
+      renderItem: (concession, index, remove) =>
+        el('div', { class: 'repeatable-item nested' },
+          el('div', { class: 'repeatable-head' },
+            el('span', { class: 'repeatable-title', text: `Concession ${index + 1}` }),
+            button('Remove', remove, { class: 'ghost tiny' })
+          ),
+          el('div', { class: 'form-row' },
+            field('Which move', select({
+              id: `concession-${index}-move`, value: concession.move,
+              options: (debate.moves || []).map((move) => [move.id, moveOptionLabel(debate, move)]),
+              onChange: (value) => { concession.move = value; touch(); },
+            }), { id: `concession-${index}-move` }),
+            field('Which side says so', select({
+              id: `concession-${index}-side`, value: concession.side,
+              options: (debate.sides || []).map((side) => [side.id, side.name || side.id]),
+              onChange: (value) => { concession.side = value; touch(); },
+            }), { id: `concession-${index}-side` })
+          ),
+          field('Where it stands', select({
+            id: `concession-${index}-state`, value: concession.state,
+            options: CONCESSION_STATES.map((state) => [state, CONCESSION_LABELS[state]]),
+            onChange: (value) => { concession.state = value; touch(); },
+          }), { id: `concession-${index}-state`, hint: 'Recording a concession is usually more informative than recording a victory.' }),
+          field('Note', textInput({
+            id: `concession-${index}-note`, value: concession.note || '',
+            onChange: (value) => { concession.note = value; touch(); },
+          }), { id: `concession-${index}-note` })
+        ),
+    });
+    clear(concessionsNode).append(list.node);
+  };
+
+  // ---------------------------------------------------------- adjudication
+
+  const adjudicationNode = el('div', { class: 'adjudication-fields' });
+
+  /**
+   * Only a named person decides.
+   *
+   * The fields appear when a human is recording their own judgement, and the
+   * text inputs deliberately do not re-render on keystroke, so the caret stays
+   * where it is while somebody writes their reasons.
+   */
+  const renderAdjudication = () => {
+    const adjudication = (debate.adjudication = debate.adjudication || { state: 'open' });
+    const decided = adjudication.state === 'decided';
+    const unresolved = adjudication.state === 'unresolved';
+
+    clear(adjudicationNode).append(
+      decided
+        ? field('Adjudicator', textInput({
+            id: 'adjudication-adjudicator',
+            value: adjudication.adjudicator || '',
+            onChange: (value) => { adjudication.adjudicator = value; touch(); },
+          }), {
+            id: 'adjudication-adjudicator',
+            hint: 'A named person. The tool will not fill this in, because a decision the tool made would be worth nothing.',
+          })
+        : null,
+      decided
+        ? field('Decision', textInput({
+            id: 'adjudication-decision',
+            value: adjudication.decision || '',
+            onChange: (value) => { adjudication.decision = value; touch(); },
+          }), { id: 'adjudication-decision', hint: 'Which side, or which claim, in one sentence.' })
+        : null,
+      decided || unresolved
+        ? field(decided ? 'Reasons' : 'Why nobody moved', textArea({
+            id: 'adjudication-reasons',
+            value: adjudication.reasons || '',
+            rows: 3,
+            onChange: (value) => { adjudication.reasons = value; touch(); },
+          }), { id: 'adjudication-reasons' })
+        : el('p', { class: 'hint', text: 'Still open. Nothing is implied by that.' })
+    );
+  };
+
+  renderTerms();
+  renderSides();
+  renderMoves();
+  renderConcessions();
+  renderAdjudication();
+
+  const node = el('article', { class: 'editor debate-editor' },
+    datalists(),
+    el('datalist', { id: 'term-card-ids' }, cards.map((card) => el('option', { value: card.id, text: card.concept.label }))),
+    el('p', { class: 'crumb' }, el('a', { href: '#/drafts', text: '← Your drafts' })),
+    el('h2', { text: debate.motion || 'New debate', tabindex: '-1' }),
+    el('p', { class: 'lede' }, 'A structured disputation. Terms are pinned before anyone argues about them, every side states what it has to establish, and an objection must restate what it attacks before answering it. This stays on your device until you export it.'),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'The motion' }),
+      field('Motion', textArea({
+        id: 'debate-motion', value: debate.motion, rows: 2,
+        onChange: (value) => { debate.motion = value; touch(); },
+      }), { id: 'debate-motion', hint: 'One sentence that could be affirmed or denied. \u201cHesed is untranslatable\u201d is a motion; \u201ctranslation\u201d is a topic.' }),
+      el('div', { class: 'form-row' },
+        field('Kind', select({
+          id: 'debate-kind', value: debate.kind,
+          options: DEBATE_KINDS.map((kind) => [kind, kind]),
+          onChange: (value) => { debate.kind = value; touch(); },
+        }), { id: 'debate-kind' }),
+        field('Opened', textInput({
+          id: 'debate-created', value: debate.created, type: 'date',
+          onChange: (value) => { debate.created = value; touch(); },
+        }), { id: 'debate-created' })
+      )
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Terms, pinned before argument' }),
+      hint('Most interfaith disagreement about a word is disagreement about the word. Pin it first, or find out that you cannot.'),
+      termsNode
+    ),
+
+    stateNode,
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Sides and their burdens' }),
+      hint('A debate without a stated burden is an argument.'),
+      sidesNode
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'The exchange' }),
+      movesNode
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Where each move stands' }),
+      concessionsNode
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Adjudication' }),
+      hint('The tool does not decide debates and there is nowhere here to make it try. A decision needs a named person and their reasons; leaving it open or unresolved is a legitimate outcome.'),
+      field('State', select({
+        id: 'adjudication-state', value: debate.adjudication?.state || 'open',
+        options: ADJUDICATION_STATES.map((state) => [state, state]),
+        onChange: (value) => { setPath(debate, 'adjudication.state', value); renderAdjudication(); },
+      }), { id: 'adjudication-state' }),
+      adjudicationNode,
+    ),
+
+    el('fieldset', { class: 'group' },
+      el('legend', { text: 'Note' }),
+      textArea({
+        id: 'debate-note', value: debate.note || '', rows: 2,
+        onChange: (value) => { debate.note = value; touch(); },
+      })
+    ),
+
+    findingsNode,
+
+    el('div', { class: 'actions sticky-actions' },
+      button('Save', () => onSave(debate)),
+      button('Export debate JSON', () => onExport('debate', debate), { class: 'ghost' }),
+      button('Export for circulation (Markdown)', () => onExport('debate-markdown', debate), { class: 'ghost' }),
+      button('Print', () => window.print(), { class: 'ghost' }),
+      button('Start over', () => onReset(), { class: 'ghost' }),
+      button('Delete', () => onDelete(debate.id), { class: 'ghost danger' })
+    )
+  );
+
+  refresh();
+  return { node, refresh };
+}
+
+/** A readable label for a move, for picking one in a select. */
+function moveOptionLabel(debate, move) {
+  const index = (debate.moves || []).indexOf(move) + 1;
+  const kind = MOVE_KIND_LABELS[move.kind] || move.kind;
+  return `${index}. ${kind}${move.claim ? ` — ${move.claim.slice(0, 40)}` : ''}`;
+}
+
+/** Facts about the record. No score, no winner, and it says so. */
+function debatePanel(debate, cards) {
+  const state = debateState(debate);
+
+  return el('div', { class: 'panel-block' },
+    el('h3', { text: 'Where this stands' }),
+    el('p', { class: 'hint', text: 'Facts about the record, not a verdict. This panel does not know who argued better and there is no way to tell it.' }),
+
+    el('ul', { class: 'stats' },
+      stat(state.moves, 'moves'),
+      stat(state.unanswered.length, 'objections unanswered'),
+      stat(state.unsupported.length, 'arguments citing nothing'),
+      stat(state.unwarranted.length, 'arguments with no warrant'),
+      stat(state.unpinnedTerms.length, 'terms still unpinned')
+    ),
+
+    state.terminologyFirst
+      ? el('p', { class: 'clean', text: 'Every term was pinned before argument. Whatever the outcome, the sides were arguing about the same thing.' })
+      : el('p', { class: 'hint', text: 'At least one term was left unpinned, so some of this may be a disagreement about a word rather than about doctrine.' }),
+
+    el('ul', { class: 'parity-list' }, state.bySide.map((entry) =>
+      el('li', { class: 'parity-row' },
+        el('span', { auto: entry.side.name || entry.side.id }),
+        el('span', { class: 'lang', text: entry.side.position }),
+        el('span', { class: 'lang', text: `${entry.moves} moves` }),
+        entry.burdensStated
+          ? el('span', { class: 'status status-ok', text: 'burden stated' })
+          : el('span', { class: 'status status-alert', text: 'no burden stated' }),
+        state.concessions.get(entry.side.id)
+          ? el('span', { class: 'lang', text: `${state.concessions.get(entry.side.id).conceded || 0} conceded` })
+          : null
+      )
+    )),
+
+    state.vagueSteelman.length
+      ? el('div', { class: 'signals' },
+          el('h4', { text: 'Thin restatements' }),
+          el('ul', {}, state.vagueSteelman.map((move) => el('li', { text: `${move.id}: the other side's argument is restated too briefly to be fair to it` })))
+        )
+      : null,
+
+    state.unanswered.length
+      ? el('div', { class: 'signals' },
+          el('h4', { text: 'Objections nobody answered' }),
+          el('ul', {}, state.unanswered.map((move) => el('li', { text: move.claim || move.id })))
+        )
+      : null,
+
+    state.reliedOn.length
+      ? el('div', { class: 'cited' },
+          el('h4', { text: 'Term cards relied on' }),
+          el('ul', {}, state.reliedOn.map((entry) => {
+            const card = cards.find((c) => c.id === entry.card);
+            return el('li', {},
+              card ? el('a', { href: `#/term/${encodeURIComponent(card.id)}`, auto: card.concept.label }) : el('code', { text: entry.card }),
+              el('span', { text: ` ×${entry.count}` })
+            );
+          }))
+        )
+      : null,
+
+    el('p', { class: 'hint' },
+      'Adjudication: ',
+      debate.adjudication?.state === 'decided'
+        ? el('strong', { text: `decided by ${debate.adjudication.adjudicator || 'an unnamed person'}` })
+        : el('strong', { text: debate.adjudication?.state === 'unresolved' ? 'recorded as unresolved' : 'still open' })
+    )
+  );
+}
+
 // ------------------------------------------------------------------ settings
 
 export function settingsView({ settings, onChange, onExportArchive, onImportArchive, onClearAll, storageOk, counts }) {
@@ -972,7 +1501,7 @@ export function settingsView({ settings, onChange, onExportArchive, onImportArch
 
     el('fieldset', { class: 'group' },
       el('legend', { text: 'Your data' }),
-      el('p', { class: 'hint', text: `Currently on this device: ${counts.cards} draft card(s), ${counts.statements} statement(s). Nothing here has ever been sent anywhere.` }),
+      el('p', { class: 'hint', text: `Currently on this device: ${counts.cards} draft card(s), ${counts.statements} statement(s), ${counts.debates ?? 0} debate(s). Nothing here has ever been sent anywhere.` }),
       el('div', { class: 'actions' },
         button('Export everything as a file', onExportArchive),
         button('Import an archive', onImportArchive, { class: 'ghost' }),

@@ -61,6 +61,57 @@ blank, and the record says that too.
 
 ---
 
+## The debate record
+
+A statement is for a text the parties agree on. A **debate** (`witness/debate`)
+is the opposite situation: sides, a question in dispute, and an outcome that may
+be a decision or may honestly be that nobody moved. That cannot be squeezed into
+a statement, so it is its own record.
+
+```
+debate
+  motion        one sentence that could be affirmed or denied
+  terms[]       { term, card, status: settled|contested|undefined, agreed, note }
+  sides[]       { id, name, position, burden, languages[] }
+  moves[]       { id, side, kind: opening|argument|objection|response|closing,
+                  claim, evidence[]: { source, locator, card },
+                  warrant, impact, steelman, targets[], language }
+  concessions[] { move, side, state: conceded|contested|unaddressed, note }
+  adjudication  { state: open|decided|unresolved, adjudicator, decision, reasons }
+```
+
+Four rules, each answering a specific way that religious argument goes wrong.
+
+1. **Terms are pinned before argument.** Most interfaith disagreement about a
+   word is disagreement about the word, and the cheapest move in the genre is
+   *"that is not what hesed means"*. Each contested term records what both sides
+   accept it means **for this debate**, and which card each side relies on. If the
+   terms cannot be pinned, `status` says so and the record says so loudly —
+   because then the debate is about terminology, and the participants should know
+   that before spending an hour on doctrine. A settled term needs the actual
+   wording; an unsettled one needs a note on how the readings differ.
+2. **An objection must restate what it attacks, in its strongest form.**
+   `steelman` is required, and lint **rejects** an objection without it. This is
+   the only structural defence against strawmanning, which is the most common way
+   a debate produces heat without progress. A restatement too short to be fair is
+   flagged.
+3. **Every argument carries evidence and a warrant.** Evidence is a citation,
+   ideally a term card; the warrant is why that evidence supports the claim.
+   Missing either is *flagged, not blocked* — sometimes you are reasoning from a
+   text you have not quoted yet, and a format that refuses to record that is a
+   format people work around.
+4. **The tool never adjudicates.** `decided` requires a named person and their
+   reasons, and lint rejects a decision without either. What the tool computes is
+   facts about the record: which objections went unanswered, which arguments cite
+   nothing, which terms were left unpinned, what each side conceded. It has no
+   score, no ranking, and no notion of who is winning — and there is a test that
+   fails if anyone ever adds one.
+
+`unresolved` is a first-class outcome, not a failure. In a dispute about
+terminology it is often the more honest answer than a decision.
+
+---
+
 ## The line that cannot be crossed
 
 **The repository is public. Case data is not.**

@@ -24,6 +24,7 @@ const LEGACY_PREFIX = 'colophon:v1:';
 const KEYS = {
   cards: `${PREFIX}cards`,
   statements: `${PREFIX}statements`,
+  debates: `${PREFIX}debates`,
   settings: `${PREFIX}settings`,
   recents: `${PREFIX}recents`,
 };
@@ -161,6 +162,27 @@ export function saveSettings(settings) {
   return write(KEYS.settings, settings);
 }
 
+// ------------------------------------------------------------------- debates
+
+export function loadDebates() {
+  const stored = read(KEYS.debates, []);
+  return Array.isArray(stored) ? stored : [];
+}
+
+export function saveDebate(debate) {
+  const debates = loadDebates();
+  const record = { ...debate, _savedAt: new Date().toISOString() };
+  const index = debates.findIndex((d) => d.id === debate.id);
+  if (index === -1) debates.push(record);
+  else debates[index] = record;
+  const result = write(KEYS.debates, debates);
+  return { ...result, debate: record };
+}
+
+export function deleteDebate(id) {
+  return write(KEYS.debates, loadDebates().filter((d) => d.id !== id));
+}
+
 // -------------------------------------------------------------------- recents
 
 export function loadRecents() {
@@ -182,32 +204,43 @@ export function exportEverything() {
     exported: new Date().toISOString(),
     drafts: loadDraftCards(),
     statements: loadStatements(),
+    debates: loadDebates(),
     settings: loadSettings(),
   };
 }
 
+const mergeById = (existing, incoming) => {
+  const merged = [...existing];
+  for (const item of incoming || []) {
+    const index = merged.findIndex((entry) => entry.id === item.id);
+    if (index === -1) merged.push(item);
+    else merged[index] = item;
+  }
+  return merged;
+};
+
 export function importEverything(archive) {
   if (!archive || typeof archive !== 'object') throw new Error('not a Witness archive');
-  if (!Array.isArray(archive.drafts) && !Array.isArray(archive.statements)) {
-    throw new Error('archive has neither drafts nor statements');
-  }
-  const drafts = loadDraftCards();
-  const statements = loadStatements();
-
-  for (const card of archive.drafts || []) {
-    const index = drafts.findIndex((c) => c.id === card.id);
-    if (index === -1) drafts.push(card);
-    else drafts[index] = card;
-  }
-  for (const statement of archive.statements || []) {
-    const index = statements.findIndex((s) => s.id === statement.id);
-    if (index === -1) statements.push(statement);
-    else statements[index] = statement;
+  const hasAnything = ['drafts', 'statements', 'debates'].some((key) => Array.isArray(archive[key]));
+  if (!hasAnything) {
+    throw new Error('archive has no drafts, statements, or debates');
   }
 
-  const a = write(KEYS.cards, drafts);
-  const b = write(KEYS.statements, statements);
+  const drafts = mergeById(loadDraftCards(), archive.drafts);
+  const statements = mergeById(loadStatements(), archive.statements);
+  const debates = mergeById(loadDebates(), archive.debates);
+
+  const writes = [
+    write(KEYS.cards, drafts),
+    write(KEYS.statements, statements),
+    write(KEYS.debates, debates),
+  ];
   if (archive.settings) write(KEYS.settings, { ...DEFAULT_SETTINGS, ...archive.settings });
 
-  return { drafts: drafts.length, statements: statements.length, ok: a.ok && b.ok };
+  return {
+    drafts: drafts.length,
+    statements: statements.length,
+    debates: debates.length,
+    ok: writes.every((result) => result.ok),
+  };
 }

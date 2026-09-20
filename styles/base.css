@@ -343,6 +343,17 @@ fieldset.nested-group { border-style: dashed; margin: 0.8rem 0; background: var(
 .repeatable-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-block-end: 0.4rem; }
 .repeatable-title { font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
 .repeatable .add { margin-block-start: 0.6rem; }
+
+/* Picking which moves a move answers. A long debate has many, so it scrolls. */
+.target-list {
+  list-style: none; margin: 0;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  max-height: 12rem; overflow-y: auto;
+}
+.target-list .facet { font-size: 0.9rem; }
+.debate-panel .panel-block { margin-block: 1.2rem; }
+.adjudication-fields:empty { display: none; }
 .repeatable-host { display: block; }
 
 .findings { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.9rem 1.1rem; margin-block: 1.2rem; background: var(--paper-raised); }

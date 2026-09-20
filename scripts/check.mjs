@@ -21,6 +21,9 @@ import {
   parseCardsInput, parseStatementInput, statementToMarkdown, filename,
 } from '../app/export.js';
 import { migrateLegacyStorage, loadDraftCards, loadSettings } from '../app/store.js';
+import {
+  blankDebate, debateSlug, nextMoveId, lintDebate, debateState, debateToMarkdown,
+} from '../app/debate.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -488,6 +491,154 @@ check(
   baseDigest(cards) === 'd7d20f7e34df8dd4446c9f92bd4d21ce12ed83ec04c11525a317707c2d4eaec9',
   baseDigest(cards)
 );
+
+// ------------------------------------------------------------------- debates
+
+const debate = {
+  format: 'witness/debate',
+  version: 1,
+  id: 'hesed-untranslatable',
+  motion: 'Rendering hesed as loving-kindness misleads a modern reader.',
+  kind: 'disputation',
+  created: '2026-01-01',
+  terms: [
+    { term: 'hesed', card: 'hesed', status: 'contested', note: 'pro reads it as covenant loyalty; con reads it as mercy', agreed: '' },
+  ],
+  sides: [
+    { id: 'pro', name: 'A.', position: 'affirms', burden: 'show a modern reader is misled', languages: ['en'] },
+    { id: 'con', name: 'B.', position: 'denies', burden: 'show the rendering carries the sense well enough', languages: ['en'] },
+  ],
+  moves: [
+    { id: 'm1', side: 'pro', kind: 'opening', claim: 'The compound drifts toward sentiment.', warrant: '', evidence: [], targets: [], language: 'en' },
+    { id: 'm2', side: 'con', kind: 'argument', claim: 'Readers meet the word and then read commentaries.', warrant: 'Translation is a first step.', evidence: [{ source: 'NRSV preface', card: 'hesed' }], targets: [], language: 'en' },
+    {
+      id: 'm3', side: 'pro', kind: 'objection',
+      claim: 'The commentary only helps those who have it.',
+      steelman: 'The objection grants that translations are read alongside commentary, and that the compound is the best single phrase available.',
+      targets: ['m2'], evidence: [], language: 'en',
+    },
+  ],
+  concessions: [{ move: 'm2', side: 'pro', state: 'contested', note: '' }],
+  adjudication: { state: 'open', adjudicator: '', decision: '', reasons: '' },
+  note: '',
+};
+
+const debateErrors = (value) => lintDebate(value).filter((f) => f.level === 'error');
+const debateWarnings = (value) => lintDebate(value).filter((f) => f.level === 'warn');
+
+check('a well-formed debate passes lint with no errors', debateErrors(debate).length === 0, JSON.stringify(debateErrors(debate)));
+check('a blank debate is rejected', debateErrors(blankDebate()).length > 0);
+check('a debate with no motion is rejected', debateErrors({ ...debate, motion: '' }).some((f) => f.path === 'motion'));
+check('a topic masquerading as a motion is warned about', debateWarnings({ ...debate, motion: 'Translation' }).some((f) => f.path === 'motion'));
+
+// Burden is the rule that separates a debate from two statements.
+check(
+  'a side with no burden is an error, not a suggestion',
+  debateErrors({ ...debate, sides: [{ ...debate.sides[0], burden: '' }, debate.sides[1]] }).some((f) => f.path === 'sides[0].burden')
+);
+check('an unknown side on a move is an error', debateErrors({ ...debate, moves: [{ ...debate.moves[0], side: 'nobody' }] }).some((f) => f.path.startsWith('moves')));
+check('duplicate move ids are an error', debateErrors({ ...debate, moves: [debate.moves[0], { ...debate.moves[1], id: 'm1' }] }).some((f) => f.message.includes('duplicate')));
+check('a move answering a move that does not exist is an error', debateErrors({ ...debate, moves: [debate.moves[0], { ...debate.moves[2], targets: ['m9'] }] }).some((f) => f.path === 'moves[1].targets'));
+
+// The rule the whole format exists for: no strawmen.
+check(
+  'an objection with no restatement of the other side is an error',
+  debateErrors({ ...debate, moves: [debate.moves[0], debate.moves[1], { ...debate.moves[2], steelman: '' }] })
+    .some((f) => f.path === 'moves[2].steelman')
+);
+check(
+  'a restatement too short to be fair is warned about',
+  debateWarnings({ ...debate, moves: [debate.moves[0], debate.moves[1], { ...debate.moves[2], steelman: 'they are wrong' }] })
+    .some((f) => f.path === 'moves[2].steelman')
+);
+check(
+  'an objection that answers nothing is an error',
+  debateErrors({ ...debate, moves: [debate.moves[0], debate.moves[1], { ...debate.moves[2], targets: [] }] })
+    .some((f) => f.message.includes('specific move'))
+);
+
+// Argument hygiene is flagged, not blocked.
+check(
+  'an argument citing nothing is warned about',
+  debateWarnings({ ...debate, moves: [debate.moves[0], { ...debate.moves[1], evidence: [] }] }).some((f) => f.message.includes('cites nothing'))
+);
+check(
+  'an argument with no warrant is warned about',
+  debateWarnings({ ...debate, moves: [debate.moves[0], { ...debate.moves[1], warrant: '' }] }).some((f) => f.path === 'moves[1].warrant')
+);
+
+// Terms.
+check(
+  'an unpinned term with no explanation is an error',
+  debateErrors({ ...debate, terms: [{ term: 'hesed', status: 'contested', note: '' }] }).some((f) => f.path === 'terms[0].note')
+);
+check(
+  'a settled term needs the wording both sides accept',
+  debateErrors({ ...debate, terms: [{ term: 'hesed', card: 'hesed', status: 'settled', agreed: '' }] }).some((f) => f.path === 'terms[0].agreed')
+);
+check('a debate with no terms pinned is warned about', debateWarnings({ ...debate, terms: [] }).some((f) => f.path === 'terms'));
+
+// Adjudication: a human decides, or nobody does.
+check(
+  'a decision without a named adjudicator is an error',
+  debateErrors({ ...debate, adjudication: { state: 'decided', decision: 'pro', reasons: 'because' } })
+    .some((f) => f.path === 'adjudication.adjudicator')
+);
+check(
+  'a decision without reasons is an error',
+  debateErrors({ ...debate, adjudication: { state: 'decided', adjudicator: 'Someone', decision: 'pro' } })
+    .some((f) => f.path === 'adjudication.reasons')
+);
+check(
+  'deciding while a term is unpinned is warned about',
+  debateWarnings({ ...debate, adjudication: { state: 'decided', adjudicator: 'Someone', decision: 'pro', reasons: 'reasons' } })
+    .some((f) => f.message.includes('unpinned'))
+);
+check(
+  'deciding with objections unanswered is warned about',
+  debateWarnings({ ...debate, adjudication: { state: 'decided', adjudicator: 'Someone', decision: 'pro', reasons: 'reasons' } })
+    .some((f) => f.message.includes('unanswered'))
+);
+check('an unresolved debate is a legitimate record', debateErrors({ ...debate, adjudication: { state: 'unresolved', reasons: 'nobody moved', adjudicator: '', decision: '' } }).length === 0);
+
+// State: facts about the record.
+const debateStateNow = debateState(debate);
+check('an objection with no response is reported unanswered', debateStateNow.unanswered.length === 1);
+check(
+  'answering an objection clears it',
+  debateState({
+    ...debate,
+    moves: [...debate.moves, { id: 'm4', side: 'con', kind: 'response', claim: 'Fair, but it still travels.', targets: ['m3'], evidence: [], language: 'en' }],
+  }).unanswered.length === 0
+);
+check('moves are counted per side', debateStateNow.bySide.find((s) => s.side.id === 'pro').moves === 2);
+check('stated burdens are reported', debateStateNow.bySide.every((entry) => entry.burdensStated));
+check('an unpinned term is surfaced', debateStateNow.unpinnedTerms.length === 1);
+check('terminologyFirst is false while a term is unpinned', debateStateNow.terminologyFirst === false);
+check(
+  'terminologyFirst is true once every term is settled',
+  debateState({ ...debate, terms: [{ term: 'hesed', status: 'settled', agreed: 'the covenant loyalty of God' }] }).terminologyFirst === true
+);
+check('concessions are counted per side', debateStateNow.concessions.get('pro').contested === 1);
+check('term cards relied on are aggregated from evidence', debateStateNow.reliedOn[0].card === 'hesed');
+check('languages of the moves are collected', debateStateNow.languages.includes('en'));
+
+// The rule this format exists to protect: it does not pick a winner.
+check(
+  'there is no score, points, or winner anywhere in the state',
+  !['winner', 'score', 'points', 'verdict', 'ranking'].some((key) => key in debateStateNow)
+);
+const debateMarkdown = debateToMarkdown(debate);
+check('the debate record says the counts are not a verdict', debateMarkdown.includes('not a verdict'));
+check('the debate record prints the motion', debateMarkdown.includes('Rendering hesed as loving-kindness'));
+check('the debate record prints the burdens', debateMarkdown.includes('must establish'));
+check('the debate record marks an unanswered objection', debateMarkdown.includes('Left unanswered'));
+check('the debate record prints the restatement', debateMarkdown.includes('Restated at its strongest'));
+check('the debate record never claims a side won', !/\bwins\b|\bvictor/i.test(debateMarkdown));
+
+check('nextMoveId increments', nextMoveId(debate) === 'm4');
+check('nextMoveId starts at m1', nextMoveId({ moves: [] }) === 'm1');
+check('debateSlug derives an id from the motion', debateSlug({ motion: 'Hesed is untranslatable!' }) === 'hesed-is-untranslatable');
 
 // ------------------------------------------------------------------ report
 

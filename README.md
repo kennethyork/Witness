@@ -46,12 +46,20 @@ The domain has a mature precedent for primitives 2 and 3: multilingual legal dra
 - **Import** a card, several cards, a statement, or an archive — by paste or file.
 - **Export for other people's tools**: CSV and TBX-Lite for translators and terminologists, Markdown for circulating a statement, JSON for the repository.
 
+**Argue** — structured disputation, which is a different thing from dialogue:
+
+- **Debate records** with a motion, terms pinned *before* argument, sides with stated burdens, and moves that carry evidence and a warrant.
+- **An objection must restate what it attacks, in its strongest form** — enforced by validation, not requested. This is the only structural defence against strawmanning.
+- **The tool never adjudicates.** A decision requires a named person and their reasons; the record computes which objections went unanswered and what was conceded, and it has no score. There is a test that fails if anyone ever adds one.
+- **`unresolved` is a legitimate outcome**, and often the honest one.
+
 **Deliberately absent**, and not by omission:
 
 - No translator. It never renders your sentence into another language and never claims a loss it cannot name.
 - No authority. Cards state who said what and on what basis, and unreviewed ones say so loudly.
 - No machine reader. It cannot tell whether two texts mean the same thing, so it never tries: divergences are declared by named people, and the only automatic comparison is counting words — reported as *a question to ask a human*, never as a finding.
 - No upload path. See below.
+- No verdict. It will not tell you who won a debate, and it is built so that it cannot: a tool that scored religious argument would be the worst possible version of this.
 
 ## The line that cannot be crossed
 
@@ -145,6 +153,19 @@ Consequences that are enforced rather than hoped for:
 - The build is **deterministic**: same cards, byte-identical output. No timestamps, sorted cards, fixed key order.
 - The browser and the build share [`app/hash.js`](app/hash.js), so a digest shown on the page cannot drift from the digest the build published.
 - Hashing does not depend on `crypto.subtle`, which is missing on insecure origins, so it also works from a removable disk on a machine with no network.
+
+## One thing to be careful about
+
+A recorded *loss* is a fact about **translation**, not a fault in a tradition.
+That distinction survives careful reading and does not survive quotation. In an
+adversarial setting, *"the Latin pax imports imperial imposition"* quotes fine as
+an attack on Christianity, and *"dharma rendered as religion"* quotes fine as an
+accusation of colonialism.
+
+Someone will do this. It is worth saying plainly, in the tool and in the record,
+so that nobody can claim they were not warned: the losses here are what
+languages do to each other, and every tradition in this base has lost something
+in translation. That is the argument for recording them, not against any of them.
 
 ## Contributing a card
 
